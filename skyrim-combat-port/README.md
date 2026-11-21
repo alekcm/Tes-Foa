@@ -12,14 +12,18 @@
 - [`docs/tainted-grail-skyrim-enemy-port-plan.md`](docs/tainted-grail-skyrim-enemy-port-plan.md) — контекст врагов и что является источником/переносом/новым предложением.
 - [`docs/tainted-grail-to-skyrim-ae-combat-port-design.md`](docs/tainted-grail-to-skyrim-ae-combat-port-design.md) — общий дизайн переноса боёвки.
 - [`docs/tainted-grail-skyrim-combat-research.md`](docs/tainted-grail-skyrim-combat-research.md) — исследовательское досье и нерешённые расхождения.
-- [`data/combat_tables_phases_1-2.xlsx`](data/combat_tables_phases_1-2.xlsx) и coverage JSON — исходная таблица проекта.
+- [`docs/vertical_slice_feasibility.md`](docs/vertical_slice_feasibility.md) — предкодовая оценка spider/wolf/bandit с техническими рисками и тестами.
+- [`data/combat_tables_phases_1-2.xlsx`](data/combat_tables_phases_1-2.xlsx) и [`data/phases_1-2_coverage.json`](data/phases_1-2_coverage.json) — восстановленные исследовательские таблицы и coverage.
+- [`BUILD.md`](BUILD.md) — что нужно для сборки на каждом уровне (records → Papyrus → SKSE), что не попадает в Git и как проверить окружение.
 - [`SETUP.md`](SETUP.md) — заполняемая карточка твоей конкретной версии игры и среды разработки.
 - [`DEPENDENCIES.md`](DEPENDENCIES.md) — здесь фиксируются только реально выбранные инструменты и версии.
 - [`STATUS.md`](STATUS.md) — что спроектировано, реализовано, собрано и реально проверено.
 
-## Важно: что ещё не зафиксировано
+## Цель и что ещё не зафиксировано
 
-Пока неизвестны точный runtime/exe Skyrim пользователя, магазин/платформа, набор DLC/Creation Club, mod manager/load order, наличие Windows + Creation Kit и возможность запускать игру из рабочего окружения. Эти значения надо вписать в `SETUP.md` **до реализации**. «Skyrim AE» само по себе недостаточно для выбора совместимых зависимостей.
+Пользователь сообщил, что играет в **Skyrim Special Edition (SE) со всеми дополнениями**. Для проекта это трактуется как полный набор официальных DLC (Dawnguard, Hearthfire, Dragonborn); точный runtime/exe, магазин/платформа, список плагинов, mod manager/load order и наличие инструментов пока не установлены. Старые design-документы и workbook называют целью Skyrim AE и включают отдельные Creation Club-данные; их наличие у пользователя не подтверждено, поэтому CC/AE-записи остаются optional.
+
+`SETUP.md` — только карточка target-совместимости и тестового профиля: её заполнение **не** даёт агенту доступ к ПК пользователя. Игру/CK можно тестировать из sandbox только если они реально установлены в sandbox; иначе локальные шаги выполняет пользователь и возвращает результаты. Точный runtime нужен для решений, привязанных к версии, но не блокирует независимый анализ и подготовку исходников.
 
 Пока не выбраны архитектура и toolchain, поэтому намеренно не добавлены пустые папки `src/`, не выбран SKSE, Pandora, Nemesis или Spriggit и не сочинены версии зависимостей. Их выбирают после проверки прототипа, который реализует один вертикальный срез: паук vs волк vs бандит. Весь остальной design scope остаётся обязательным, если задача — портировать всю боёвку, а не только врагов.
 

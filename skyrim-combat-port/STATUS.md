@@ -8,14 +8,18 @@
 - Implementation: не начиналась.
 - Build: не выполнялась.
 - In-game test: не выполнялся.
-- Целевой runtime: неизвестен; см. `SETUP.md`.
+- Целевая редакция по сообщению пользователя: Skyrim SE со всеми официальными DLC (Dawnguard, Hearthfire, Dragonborn); состав Creation Club/AE-контента не подтверждён.
+- Целевой runtime и магазин/платформа: неизвестны; см. `SETUP.md`. Запись этих сведений нужна для выбора совместимости, не для доступа к ПК пользователя.
+- Исследовательская книга и coverage JSON восстановлены в `data/`; данные в них остаются справочными и не подтверждены тестом в игре.
+- Предкодовая оценка spider/wolf/bandit записана в `docs/vertical_slice_feasibility.md`; реализация и выбранный toolchain по-прежнему отсутствуют.
+- Контракт сборки записан в `BUILD.md`; добавлены `.env.example` и `tools/check_env.py` (сам скрипт проверен на синтетическом дереве каталогов, не на реальной установке Skyrim).
 - Выбранный plugin/script/animation toolchain: нет; см. `DEPENDENCIES.md`.
 
 ## Матрица
 
 | Scope | Designed | Implemented | Built | Tested in game | Следующий шаг |
 |---|---|---|---|---|---|
-| Враги — 42 архетипа | Да, см. enemy spec | Нет | Нет | Нет | Проверить feasibility, начать spider/wolf/bandit vertical slice |
+| Враги — 42 архетипа | Да, см. enemy spec | Нет | Нет | Нет | Проверить в CK/игре рисковые hooks из `docs/vertical_slice_feasibility.md`; затем собирать spider/wolf/bandit vertical slice |
 | Оружие | Есть общий дизайн/исследовательская таблица; проверить покрытие для требуемого scope | Нет | Нет | Нет | Разобрать workbook, составить record-level mapping |
 | Заклинания | Есть общий дизайн/исследовательская таблица; проверить покрытие для требуемого scope | Нет | Нет | Нет | Разобрать workbook, составить record-level mapping |
 | Перки/прокачка | Есть общий дизайн/исследовательская таблица; проверить покрытие для требуемого scope | Нет | Нет | Нет | Разобрать workbook, составить record-level mapping |
