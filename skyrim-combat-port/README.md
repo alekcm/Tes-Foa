@@ -35,6 +35,7 @@ python tools\build.py --name TGCombatPort --version 0.1.0 --plugin build\TGComba
 - [`RELEASING.md`](RELEASING.md) — путь от исходников до обычного zip: упаковка, проверка установки, GitHub Releases/Nexus, разбор проблем.
 - [`TESTING.md`](TESTING.md) — план тестов среза по шагам и критериям pass/fail; пока не выполнялся.
 - [`docs/ck_setup_guide.md`](docs/ck_setup_guide.md) — первый заход в Creation Kit: какие записи создать и где проверить.
+- [`docs/workflow.md`](docs/workflow.md) — как идёт работа: что делаю я, что делаешь ты, что присылать и что коммитить.
 - [`docs/faq.md`](docs/faq.md) — короткие ответы: что уже готово, что нужно загружать агенту, почему нет `.esp`.
 - [`docs/decisions.md`](docs/decisions.md) — журнал принятых решений и открытых вопросов.
 - [`SETUP.md`](SETUP.md) — заполняемая карточка твоей конкретной версии игры и среды разработки.

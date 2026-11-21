@@ -80,8 +80,11 @@
 Скрипты лежат в `src/papyrus/*.psc`. Сборка и упаковка запускаются одной командой:
 
 ```bash
-python tools/build.py --name TGCombatPort --version 0.1.0 --plugin build/TGCombatPort.esp
+python tools/build.py --name TGCombatPort --version 0.1.0 --plugin src/plugin/TGCombatPort.esp
 ```
+
+Собранный в CK плагин держим в `src/plugin/` и коммитим: это исходник записей (см. `src/plugin/README.md`),
+а `.pex` и `dist/` остаются вне Git.
 
 Что происходит: линт исходников → поиск компилятора и флагов → компиляция всех `.psc` в `build/stage/Scripts` →
 копирование плагина и `assets/` → вызов `tools/package.py` → `dist/TGCombatPort-0.1.0.zip`.
