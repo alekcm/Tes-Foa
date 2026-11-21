@@ -28,12 +28,55 @@
 4. Ставишь `dist\TGCombatPort-0.1.0.zip` в тестовый профиль, запускаешь игру, проходишь нужные тесты из `TESTING.md`.
 5. Присылаешь мне результат. Я правлю и цикл повторяется.
 
-## Что присылать
+## Где именно взять текст
 
-- Полный текст ошибки `PapyrusCompiler.exe` (не «не компилируется», а все строки).
-- Строки `[TGCP]` из `Documents/My Games/Skyrim Special Edition/Logs/Script/Papyrus.0.log`.
-- Результаты тестов: ID из `TESTING.md`, что ожидал, что увидел.
-- Если игра падает — что делал перед падением и есть ли мод в списке плагинов.
+### Ошибка сборки
+
+Она появляется прямо в окне PowerShell. Чтобы сохранить её в файл, запусти сборку так:
+
+```powershell
+New-Item -ItemType Directory -Force logs | Out-Null
+python tools\build.py --name TGCombatPort --version 0.1.0 --plugin src\plugin\TGCombatPort.esp 2>&1 |
+  Tee-Object -FilePath logs\build_log.txt
+```
+
+Присылать: файл `logs\build_log.txt` целиком (он короткий). Если `Tee-Object` не сработал — выдели текст
+в консоли мышью и нажми Enter, чтобы скопировать.
+
+### Лог Papyrus
+
+1. Включи логи в `Documents\My Games\Skyrim Special Edition\Skyrim.ini`:
+
+   ```ini
+   [Papyrus]
+   bEnableLogging=1
+   bEnableTrace=1
+   bLoadDebugInformation=1
+   ```
+
+2. Запусти игру, воспроизведи ситуацию (бой, блок, паутина), выйди из игры.
+3. Лог лежит здесь:
+   `Documents\My Games\Skyrim Special Edition\Logs\Script\Papyrus.0.log`
+4. Собери из него короткую выжимку:
+
+   ```powershell
+   python tools\collect_logs.py
+   ```
+
+   Скрипт оставит только строки `[TGCP]` и строки с ошибками, запишет `logs\papyrus_report.txt`
+   и напечатает, сколько всего совпадений.
+
+Присылать: файл `logs\papyrus_report.txt` или его текст. Полный лог на тысячи строк не нужен.
+
+### Результаты тестов
+
+Текстом: ID из `TESTING.md`, что ожидал, что увидел, pass/fail. Если игра упала — что делал перед падением
+и есть ли мод в списке плагинов.
+
+## Куда это положить
+
+В папку `logs\` в проекте — она в `.gitignore`, в Git не попадёт. Оттуда файл можно приложить в чат.
+Коммитить логи не нужно.
 
 ## Что коммитить
 

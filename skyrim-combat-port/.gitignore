@@ -38,6 +38,10 @@ release/
 .DS_Store
 Thumbs.db
 
+# Local logs collected for sending to the agent
+logs/
+build_log.txt
+
 # Python tooling
 __pycache__/
 *.pyc

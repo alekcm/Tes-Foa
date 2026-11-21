@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import build  # noqa: E402
 import check_docs  # noqa: E402
+import collect_logs  # noqa: E402
 import check_env  # noqa: E402
 import inspect_plugin  # noqa: E402
 import package  # noqa: E402
@@ -160,6 +161,35 @@ class InspectPluginTests(unittest.TestCase):
             found = inspect_plugin.candidates(archive_path)
             self.assertEqual(len(found), 1)
             self.assertEqual(found[0][0], "TGCombatPort.esp")
+
+
+class CollectLogsTests(unittest.TestCase):
+    LOG = [
+        "Papyrus log opened",
+        "error: Cannot call GetActorReference() on a None object",
+        "[TGCP] probe: registered 12 candidate events",
+        "[TGCP] anim event: blockStart | source=PlayerRef",
+        "unrelated line",
+    ]
+
+    def test_selects_mod_lines_and_errors(self) -> None:
+        selected, total = collect_logs.collect(self.LOG, r"\[TGCP\]")
+        self.assertEqual(total, 3)
+        self.assertEqual(len(selected), 3)
+        self.assertTrue(selected[0].endswith("error: Cannot call GetActorReference() on a None object"))
+        self.assertIn("[TGCP] probe", selected[1])
+
+    def test_limit_is_applied(self) -> None:
+        selected, total = collect_logs.collect(self.LOG, r"\[TGCP\]", limit=1)
+        self.assertEqual(total, 3)
+        self.assertEqual(len(selected), 1)
+
+    def test_report_contains_counts_and_path(self) -> None:
+        selected, total = collect_logs.collect(self.LOG, r"\[TGCP\]")
+        report = collect_logs.build_report(Path("C:/logs/Papyrus.0.log"), r"\[TGCP\]", selected, total, len(self.LOG))
+        self.assertIn("Строк прочитано: 5", report)
+        self.assertIn("Совпадений: 3", report)
+        self.assertIn("Papyrus.0.log", report)
 
 
 class CheckDocsTests(unittest.TestCase):
