@@ -83,8 +83,13 @@
 python tools/build.py --name TGCombatPort --version 0.1.0 --plugin build/TGCombatPort.esp
 ```
 
-Что происходит: поиск компилятора и флагов → компиляция всех `.psc` в `build/stage/Scripts` →
+Что происходит: линт исходников → поиск компилятора и флагов → компиляция всех `.psc` в `build/stage/Scripts` →
 копирование плагина и `assets/` → вызов `tools/package.py` → `dist/TGCombatPort-0.1.0.zip`.
+
+Линт (`tools/papyrus_lint.py`) проверяет парность `Event/EndEvent`, `Function/EndFunction`, `If/EndIf`,
+совпадение `ScriptName` с именем файла и отсутствие табов. Это не компилятор: типы и вызовы функций ловит
+только `PapyrusCompiler.exe`. Проверить скрипты отдельно: `python tools/papyrus_lint.py src/papyrus`.
+Тесты инструментов: `python -m unittest discover -s tests`.
 
 Чего команда не делает: не создаёт `.esp` (его собирают в CK/xEdit) и не запускает игру. Если компилятор
 не найден, она скажет об этом и завершится с кодом 2 — это нормальный результат на машине без CK.

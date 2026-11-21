@@ -23,6 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import papyrus_lint
 from check_env import load_env, as_path, find_in_dirs
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -96,6 +97,15 @@ def main() -> int:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
     except (AttributeError, ValueError):
         pass
+
+    lint_errors, lint_warnings = papyrus_lint.lint_paths([SRC])
+    for warning in lint_warnings:
+        print(f"[внимание] {warning}")
+    if lint_errors:
+        for error in lint_errors:
+            print(f"[ошибка]   {error}")
+        print("\nПроверка исходников не пройдена — компиляция отменена.")
+        return 1
 
     env = load_env()
     compiler, flags, sources = locate(env)

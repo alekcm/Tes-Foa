@@ -14,6 +14,9 @@
 - [`docs/tainted-grail-skyrim-combat-research.md`](docs/tainted-grail-skyrim-combat-research.md) — исследовательское досье и нерешённые расхождения.
 - [`docs/vertical_slice_feasibility.md`](docs/vertical_slice_feasibility.md) — предкодовая оценка spider/wolf/bandit с техническими рисками и тестами.
 - [`docs/vertical_slice_records.md`](docs/vertical_slice_records.md) — черновик: какие именно записи плагина и скрипты нужны для среза, с критериями проверки.
+- [`docs/papyrus_api.md`](docs/papyrus_api.md) — что делают уже написанные скрипты, чего они не делают и что проверять первым.
+- `src/papyrus/` — исходники скриптов: пробник animation events, наблюдатель блока, кулдаун паутины, состояние стаи.
+- `tools/` — проверка окружения, линт Papyrus, сборка и упаковка; `tests/` — тесты этих инструментов.
 - [`data/combat_tables_phases_1-2.xlsx`](data/combat_tables_phases_1-2.xlsx) и [`data/phases_1-2_coverage.json`](data/phases_1-2_coverage.json) — восстановленные исследовательские таблицы и coverage.
 - [`docs/how_a_skyrim_mod_works.md`](docs/how_a_skyrim_mod_works.md) — простыми словами: из чего состоит мод, что скачивает игрок с Nexus, чем отличаются варианты реализации и что это значит для требований к игроку.
 - [`BUILD.md`](BUILD.md) — что нужно для сборки на каждом уровне (records → Papyrus → SKSE), что не попадает в Git и как проверить окружение.

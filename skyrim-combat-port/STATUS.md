@@ -16,7 +16,8 @@
 - Черновик записей для среза — `docs/vertical_slice_records.md`; записи не создавались, плагин не собирался.
 - Упаковка подготовлена: `tools/package.py` проверяет состав и собирает `dist/<мод>-<версия>.zip`; проверен на тестовой папке, реального архива мода нет.
 - Сборка одной командой: `tools/build.py` (Papyrus → stage → zip). Обвязка проверена на заглушке компилятора; с настоящим `PapyrusCompiler.exe` не запускалась.
-- Первый исходник: `src/papyrus/TGCP_AnimEventProbe.psc` — пробник animation events для бандита и волков. Требует компиляции и теста в игре.
+- Исходники в `src/papyrus/`: `TGCP_AnimEventProbe` (пробник animation events), `TGCP_PlayerBlockWatcher` (признак блока игрока), `TGCP_WebSpiderAbility` (кулдаун и каст паутины), `TGCP_PackLeapState` (состояние «один leap на стаю», без принудительного запрета). Ни один не компилировался настоящим компилятором и не запускался в игре.
+- Линт Papyrus (`tools/papyrus_lint.py`) проходит на всех исходниках; тесты инструментов — 19 штук, проходят (`python -m unittest discover -s tests`). Линт не заменяет компилятор.
 - Выбранный plugin/script/animation toolchain: нет; см. `DEPENDENCIES.md`.
 - Решение пользователя (2026-11-21): база — плагин + Papyrus; SKSE разрешён, если конкретная механика без него не работает или работает заметно хуже. Условия: точный runtime до добавления DLL, запись версии в `DEPENDENCIES.md`, обновление требований на Nexus. Новые анимации — только после проверки ванильных. См. `docs/how_a_skyrim_mod_works.md`.
 
