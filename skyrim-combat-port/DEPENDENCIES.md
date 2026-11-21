@@ -9,12 +9,23 @@
 
 **На старте репозитория обязательных модовых зависимостей ещё не выбрано.** Не устанавливать в список SKSE, Pandora, Nemesis, FNIS, Spriggit или CommonLibSSE-NG просто «на всякий случай». Сначала прототипировать конкретный required behavior и зафиксировать, зачем нужен каждый компонент.
 
+## Политика по SKSE
+
+Решение пользователя от 2026-11-21: база мода — записи плагина и Papyrus; SKSE **разрешён**, если конкретная
+механика без него не работает или работает заметно хуже. Порядок при этом не меняется:
+
+1. Сначала прототип на записях/Papyrus и конкретное описание того, что не получается (какая механика, какой враг,
+   какое событие или действие).
+2. Перед добавлением DLL зафиксировать точный runtime из `SETUP.md` и версию SKSE в таблице ниже.
+3. Записать переход в `STATUS.md` и добавить SKSE в требования на странице Nexus.
+4. Не считать SKSE обязательной зависимостью заранее и не добавлять его «для удобства».
+
 | Компонент | Нужен? | Точная версия/tag/commit | Для чего используется | Runtime/ограничения | Ссылка | Проверено на целевой машине? |
 |---|---|---|---|---|---|---|
 | Skyrim runtime | Да | Заполнить в `SETUP.md` | Игра/совместимость | Точный exe version | https://store.steampowered.com/app/489830/ | Нет |
 | Creation Kit | Скорее всего, уточнить по плану реализации | Заполнить после проверки установки | Создание/редактирование plugin/form | PC; версия зафиксировать | https://store.steampowered.com/app/1946180/ | Нет |
 | Papyrus compiler/source scripts | Только если будут Papyrus scripts | TBD | Компиляция `.psc` → `.pex` | Требует целевые game/compiler scripts | CK / https://ck.uesp.net/wiki/Main_Page | Нет |
-| SKSE | Только если доказана необходимость extender API | TBD | Extender API / возможная native функциональность | Версия привязана к runtime | https://skse.silverlock.org/ | Нет |
+| SKSE | Разрешён пользователем; подключается по конкретной механике, а не заранее | TBD — после `SETUP.md`/`check_env.py` | Extender API / возможная native функциональность | Версия привязана к точному runtime | https://skse.silverlock.org/ | Нет |
 | CommonLibSSE-NG | Только если принят C++ SKSE plugin | TBD | C++ plugin API/build support | Пиновать commit/tag/runtime support | https://github.com/CharmedBaryon/CommonLibSSE-NG | Нет |
 | Animation behavior generator | Только если нужен новый/изменённый behavior graph | TBD | Объединение behavior/animation patches | Выбрать ровно один поддерживаемый workflow после теста | Pandora: https://github.com/Monitor221hz/Pandora-Behaviour-Engine-Plus | Нет |
 | Spriggit | Необязательно | TBD | Текстовое представление plugin records в Git | Проверить serialize → deserialize → CK/xEdit/game | https://github.com/Mutagen-Modding/Spriggit | Нет |
