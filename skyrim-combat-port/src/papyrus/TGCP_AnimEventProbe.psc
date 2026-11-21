@@ -17,8 +17,22 @@
 ScriptName TGCP_AnimEventProbe extends ReferenceAlias
 
 String[] EventNames
+Bool Registered
 
 Event OnInit()
+    Setup()
+EndEvent
+
+; OnInit может сработать до заполнения алиаса, поэтому дублируем попытку здесь.
+Event OnAliasInit()
+    Setup()
+EndEvent
+
+Function Setup()
+    If Registered
+        Return
+    EndIf
+
     EventNames = new String[12]
     EventNames[0] = "blockStart"
     EventNames[1] = "blockStop"
@@ -35,7 +49,7 @@ Event OnInit()
 
     Actor akTarget = GetActorReference()
     If akTarget == None
-        Debug.Trace("[TGCP] probe: alias has no actor, nothing registered")
+        Debug.Trace("[TGCP] probe: alias has no actor yet, will retry on OnAliasInit")
         Return
     EndIf
 
@@ -45,8 +59,9 @@ Event OnInit()
         i += 1
     EndWhile
 
+    Registered = True
     Debug.Trace("[TGCP] probe: registered " + EventNames.Length + " candidate events on " + akTarget)
-EndEvent
+EndFunction
 
 Event OnAnimationEvent(ObjectReference akSource, string asEventName)
     Debug.Trace("[TGCP] anim event: " + asEventName + " | source=" + akSource + " | self=" + GetActorReference())

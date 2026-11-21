@@ -22,7 +22,22 @@ ScriptName TGCP_PlayerBlockWatcher extends ReferenceAlias
 
 GlobalVariable Property PlayerBlocking Auto
 
+Bool Registered
+
 Event OnInit()
+    Setup()
+EndEvent
+
+; OnInit может сработать до заполнения алиаса — тогда повторяем на OnAliasInit.
+Event OnAliasInit()
+    Setup()
+EndEvent
+
+Function Setup()
+    If Registered
+        Return
+    EndIf
+
     Actor player = GetActorReference()
     If player == None
         Debug.Trace("[TGCP] block watcher: alias has no actor")
@@ -34,8 +49,9 @@ Event OnInit()
 
     RegisterForAnimationEvent(player, "blockStart")
     RegisterForAnimationEvent(player, "blockStop")
+    Registered = True
     Debug.Trace("[TGCP] block watcher registered on " + player)
-EndEvent
+EndFunction
 
 Event OnAnimationEvent(ObjectReference akSource, string asEventName)
     If PlayerBlocking == None

@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
 import build  # noqa: E402
+import check_docs  # noqa: E402
 import check_env  # noqa: E402
 import inspect_plugin  # noqa: E402
 import package  # noqa: E402
@@ -161,6 +162,24 @@ class InspectPluginTests(unittest.TestCase):
             self.assertEqual(found[0][0], "TGCombatPort.esp")
 
 
+class CheckDocsTests(unittest.TestCase):
+    def test_project_docs_have_no_broken_links(self) -> None:
+        problems: list[str] = []
+        for path in check_docs.markdown_files(check_docs.ROOT):
+            problems.extend(check_docs.check_file(path))
+        self.assertEqual(problems, [])
+
+    def test_detects_missing_link(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            document = root / "a.md"
+            document.write_text("[файл](missing.md)\n", encoding="utf-8")
+            with mock.patch.object(check_docs, "ROOT", root):
+                problems = check_docs.check_file(document)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("missing.md", problems[0])
+
+
 class CheckEnvTests(unittest.TestCase):
     def test_reports_installed_game(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -247,6 +266,65 @@ class BuildTests(unittest.TestCase):
             self.assertIsNotNone(compiler)
             self.assertEqual(compiler.name, "PapyrusCompiler.exe")
             self.assertIsNotNone(flags)
+
+    @unittest.skipIf(sys.platform == "win32", "заглушка компилятора — POSIX-скрипт")
+    def test_end_to_end_build_with_stub_compiler(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            src = work / "src"
+            src.mkdir()
+            (src / "Demo.psc").write_text(
+                "ScriptName Demo extends Quest\n\nEvent OnInit()\n    Debug.Trace(\"demo\")\nEndEvent\n",
+                encoding="utf-8",
+            )
+
+            compiler = work / "PapyrusCompiler.exe"
+            compiler.write_text(
+                "#!/usr/bin/env bash\n"
+                "out=\"\"\n"
+                "src=\"\"\n"
+                "for a in \"$@\"; do\n"
+                "  case \"$a\" in\n"
+                "    -o=*) out=\"${a#-o=}\" ;;\n"
+                "    *.psc) src=\"$a\" ;;\n"
+                "  esac\n"
+                "done\n"
+                "mkdir -p \"$out\" || exit 3\n"
+                "test -n \"$src\" || exit 4\n"
+                "printf 'pex' > \"$out/$(basename \"$src\" .psc).pex\"\n",
+                encoding="utf-8",
+            )
+            compiler.chmod(0o755)
+            flags = work / "TESV_Papyrus_Flags.flags"
+            flags.write_text("", encoding="utf-8")
+
+            plugin = work / "TGCombatPort.esp"
+            plugin.write_bytes(make_plugin(["Skyrim.esm"]))
+
+            stage = work / "stage"
+            dist = work / "dist"
+            argv = [
+                "build.py",
+                "--name",
+                "TGCombatPort",
+                "--version",
+                "0.1.0",
+                "--plugin",
+                str(plugin),
+                "--out-dir",
+                str(dist),
+            ]
+
+            with mock.patch.object(build, "SRC", src), mock.patch.object(build, "STAGE", stage), mock.patch.object(
+                build, "locate", return_value=(compiler, flags, None)
+            ), mock.patch.object(sys, "argv", argv), mock.patch("sys.stdout"):
+                exit_code = build.main()
+
+            self.assertEqual(exit_code, 0)
+            archive = dist / "TGCombatPort-0.1.0.zip"
+            self.assertTrue(archive.is_file())
+            with zipfile.ZipFile(archive) as packed:
+                self.assertEqual(sorted(packed.namelist()), ["Scripts/Demo.pex", "TGCombatPort.esp"])
 
     def test_missing_compiler_exits_with_code_2(self) -> None:
         with mock.patch.object(build, "locate", return_value=(None, None, None)), mock.patch.object(

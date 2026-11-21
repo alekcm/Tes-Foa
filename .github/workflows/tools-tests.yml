@@ -34,3 +34,6 @@ jobs:
 
       - name: Papyrus lint
         run: python tools/papyrus_lint.py src/papyrus
+
+      - name: Docs links
+        run: python tools/check_docs.py
