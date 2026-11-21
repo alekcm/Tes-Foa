@@ -1,0 +1,36 @@
+name: tools-tests
+
+on:
+  push:
+    paths:
+      - "skyrim-combat-port/tools/**"
+      - "skyrim-combat-port/tests/**"
+      - "skyrim-combat-port/src/**"
+      - ".github/workflows/tools-tests.yml"
+  pull_request:
+    paths:
+      - "skyrim-combat-port/tools/**"
+      - "skyrim-combat-port/tests/**"
+      - "skyrim-combat-port/src/**"
+
+jobs:
+  test:
+    name: Tests and lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: skyrim-combat-port
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Papyrus lint
+        run: python tools/papyrus_lint.py src/papyrus

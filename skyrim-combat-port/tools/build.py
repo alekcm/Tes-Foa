@@ -23,6 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import inspect_plugin
 import papyrus_lint
 from check_env import load_env, as_path, find_in_dirs
 
@@ -134,6 +135,16 @@ def main() -> int:
         STAGE.mkdir(parents=True, exist_ok=True)
         shutil.copy2(plugin, STAGE / plugin.name)
         print(f"Плагин: {plugin.name}")
+
+        try:
+            report = inspect_plugin.describe(plugin.read_bytes())
+        except (ValueError, OSError) as error:
+            print(f"[внимание] не удалось прочитать заголовок плагина: {error}")
+        else:
+            print(f"  мастер-файлы: {', '.join(report['masters']) or 'нет'}")
+            if report["unexpected_masters"]:
+                print(f"[внимание] плагин зависит не только от игры и DLC: {', '.join(report['unexpected_masters'])}")
+                print("           такой мод не запустится у игрока без этих плагинов")
 
     assets = ROOT / "assets"
     if assets.is_dir():

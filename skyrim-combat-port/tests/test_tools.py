@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import struct
 import sys
 import tempfile
 import unittest
 import zipfile
+import zlib
 from pathlib import Path
 from unittest import mock
 
@@ -16,6 +18,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import build  # noqa: E402
 import check_env  # noqa: E402
+import inspect_plugin  # noqa: E402
 import package  # noqa: E402
 import papyrus_lint  # noqa: E402
 
@@ -107,6 +110,55 @@ class PackageZipTests(unittest.TestCase):
 
             plugin_entry = next(item for item in manifest["files"] if item["path"] == "TGCombatPort.esp")
             self.assertEqual(plugin_entry["sha256"], hashlib.sha256(b"fake plugin").hexdigest())
+
+
+def make_plugin(masters: list[str], esl: bool = False, compressed: bool = False) -> bytes:
+    subrecords = b"".join(
+        b"MAST" + struct.pack("<H", len(master.encode()) + 1) + master.encode() + b"\x00"
+        for master in masters
+    )
+    flags = 0
+    payload = subrecords
+    if compressed:
+        flags |= inspect_plugin.COMPRESSED_FLAG
+        payload = zlib.compress(subrecords)
+    if esl:
+        flags |= inspect_plugin.ESL_FLAG
+    header = struct.pack("<4sIII", b"TES4", len(payload), flags, 0) + struct.pack("<HHHH", 0, 0, 44, 0)
+    return header + payload
+
+
+class InspectPluginTests(unittest.TestCase):
+    def test_reads_vanilla_masters(self) -> None:
+        report = inspect_plugin.describe(
+            make_plugin(["Skyrim.esm", "Update.esm", "Dawnguard.esm", "Hearthfire.esm", "Dragonborn.esm"])
+        )
+        self.assertEqual(len(report["masters"]), 5)
+        self.assertEqual(report["unexpected_masters"], [])
+        self.assertFalse(report["esl"])
+
+    def test_reports_foreign_master_and_esl(self) -> None:
+        report = inspect_plugin.describe(make_plugin(["Skyrim.esm", "SomeOtherMod.esp"], esl=True))
+        self.assertIn("SomeOtherMod.esp", report["unexpected_masters"])
+        self.assertTrue(report["esl"])
+
+    def test_reads_compressed_header(self) -> None:
+        report = inspect_plugin.describe(make_plugin(["Skyrim.esm"], compressed=True))
+        self.assertEqual(report["masters"], ["Skyrim.esm"])
+        self.assertTrue(report["compressed"])
+
+    def test_rejects_non_plugin(self) -> None:
+        with self.assertRaises(ValueError):
+            inspect_plugin.describe(b"not a plugin at all")
+
+    def test_reads_plugin_from_zip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive_path = Path(tmp) / "mod.zip"
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                archive.writestr("TGCombatPort.esp", make_plugin(["Skyrim.esm"]))
+            found = inspect_plugin.candidates(archive_path)
+            self.assertEqual(len(found), 1)
+            self.assertEqual(found[0][0], "TGCombatPort.esp")
 
 
 class CheckEnvTests(unittest.TestCase):
