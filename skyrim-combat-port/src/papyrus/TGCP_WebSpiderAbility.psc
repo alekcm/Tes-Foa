@@ -73,7 +73,9 @@ Function TryCastWeb(Actor spider)
         Return
     EndIf
 
-    spider.DoCombatSpellCast(WebSpell, false, victim)
+    ; DoCombatSpellApply есть в Actor.psc Skyrim. Если в игре не появится снаряд,
+    ; заменить на WebSpell.Cast(spider, victim) — см. docs/papyrus_verification.md.
+    spider.DoCombatSpellApply(WebSpell, victim)
     NextCastTime = Utility.GetCurrentRealTime() + CooldownSeconds
     Debug.Trace("[TGCP] web cast by " + spider + " at " + victim)
 EndFunction

@@ -19,6 +19,7 @@
 - Исходники в `src/papyrus/`: `TGCP_AnimEventProbe` (пробник animation events), `TGCP_PlayerBlockWatcher` (признак блока игрока), `TGCP_WebSpiderAbility` (кулдаун и каст паутины), `TGCP_PackLeapState` (состояние «один leap на стаю», без принудительного запрета). Ни один не компилировался настоящим компилятором и не запускался в игре.
 - Линт Papyrus (`tools/papyrus_lint.py`) проходит на всех исходниках; тесты инструментов — 27 штук, проходят (`python -m unittest discover -s tests`). Линт не заменяет компилятор.
 - План тестов — `TESTING.md`; инструкция по первым записям в CK — `docs/ck_setup_guide.md`. Оба документа написаны, но ни один шаг не выполнялся.
+- Используемые Papyrus-функции сверены с документацией (`docs/papyrus_verification.md`); `DoCombatSpellCast` не используется, так как для Skyrim не подтверждён.
 - `tools/inspect_plugin.py` читает мастер-файлы и ESL-флаг плагина (проверен на синтетических заголовках); сборка предупреждает о не-ванильных мастер-файлах.
 - `tools/check_docs.py` проверяет локальные ссылки в Markdown; им найдена и исправлена битая ссылка на книгу в `docs/tainted-grail-skyrim-combat-research.md`. CI-workflow `.github/workflows/tools-tests.yml` запускает тесты, линт Papyrus и проверку ссылок.
 - SKSE и animation toolchain не подключены; базовый путь (записи + Papyrus) выбран, версии инструментов не зафиксированы — см. `DEPENDENCIES.md`.

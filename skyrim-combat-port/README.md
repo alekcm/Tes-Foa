@@ -26,6 +26,7 @@ python tools\build.py --name TGCombatPort --version 0.1.0 --plugin build\TGComba
 - [`docs/vertical_slice_feasibility.md`](docs/vertical_slice_feasibility.md) — предкодовая оценка spider/wolf/bandit с техническими рисками и тестами.
 - [`docs/vertical_slice_records.md`](docs/vertical_slice_records.md) — черновик: какие именно записи плагина и скрипты нужны для среза, с критериями проверки.
 - [`docs/papyrus_api.md`](docs/papyrus_api.md) — что делают уже написанные скрипты, чего они не делают и что проверять первым.
+- [`docs/papyrus_verification.md`](docs/papyrus_verification.md) — сверка каждой Papyrus-функции с документацией и запасные варианты.
 - `src/papyrus/` — исходники скриптов: пробник animation events, наблюдатель блока, кулдаун паутины, состояние стаи.
 - `tools/` — проверка окружения, линт Papyrus, сборка, упаковка, проверка заголовка плагина и ссылок в документации; `tests/` — тесты этих инструментов.
 - [`data/combat_tables_phases_1-2.xlsx`](data/combat_tables_phases_1-2.xlsx) и [`data/phases_1-2_coverage.json`](data/phases_1-2_coverage.json) — восстановленные исследовательские таблицы и coverage.
