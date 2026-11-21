@@ -26,7 +26,8 @@ Windows PowerShell для чтения версии (замени путь на 
 ## Разработка и запуск
 
 - Windows version / архитектура: `UNKNOWN`
-- Creation Kit: установлен (найден `CreationKit.exe` рядом с игрой); точная версия не записана
+- Creation Kit: установлен и запускался хотя бы раз (после запуска появились `Data\Source\Scripts`); точная версия не записана
+- Компиляция Papyrus: проверена 2026-11-21, 4 скрипта, 0 ошибок/0 предупреждений
 - PapyrusCompiler.exe: найден (`Papyrus Compiler` в папке игры)
 - `TESV_Papyrus_Flags.flg`: появляется в `Data\Source\Scripts` после первого запуска CK; `tools/check_env.py` ищет его по папке игры и внутри `Data/Scripts.zip`, `build.py` умеет извлекать из архива
 - SKSE: не установлен; если понадобится, версия должна точно соответствовать runtime `1.7.104.0`
