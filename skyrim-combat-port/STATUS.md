@@ -14,6 +14,7 @@
 - Предкодовая оценка spider/wolf/bandit записана в `docs/vertical_slice_feasibility.md`; реализация и выбранный toolchain по-прежнему отсутствуют.
 - Контракт сборки записан в `BUILD.md`; добавлены `.env.example` и `tools/check_env.py` (сам скрипт проверен на синтетическом дереве каталогов, не на реальной установке Skyrim).
 - Выбранный plugin/script/animation toolchain: нет; см. `DEPENDENCIES.md`.
+- Предложенный принцип реализации: плагин + Papyrus, без SKSE/новых анимаций до доказанной необходимости; ждёт подтверждения пользователя, см. `docs/how_a_skyrim_mod_works.md`.
 
 ## Матрица
 
