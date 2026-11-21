@@ -28,7 +28,8 @@ build/stage/
 └─ Sound/tgcp_hiss.xwm
 ```
 
-Затем:
+Обычно stage собирается сам: `python tools/build.py` компилирует `src/papyrus/*.psc`, кладёт плагин в stage и
+вызывает упаковщик (см. `BUILD.md`). Вручную упаковать уже готовую папку можно так:
 
 ```bash
 python tools/package.py --stage build/stage --name TGCombatPort --version 0.1.0
