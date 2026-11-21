@@ -395,8 +395,18 @@ def main() -> int:
         for row in rows:
             print(f"{marks[row['status']]}{row['title']:<{width}}  {row['detail']}")
         print()
-        print("Что это значит: [нет] у уровня A — нужен CK или xEdit; [нет] у Papyrus — скрипты не собрать;")
-        print("SKSE нужен только если прототип докажет необходимость C++ DLL.")
+        titles = {
+            "plugin": "A. плагин (нужен CK или xEdit)",
+            "papyrus": "B. Papyrus (компилятор и исходные скрипты)",
+            "native": "C. SKSE DLL (сейчас не требуется, только по доказанной необходимости)",
+        }
+        by_key = {row["key"]: row for row in rows}
+        for tier, keys in TIER_REQUIRES.items():
+            missing = [by_key[key]["title"] for key in keys if by_key[key]["status"] != "ok"]
+            if missing:
+                print(f"Уровень {titles[tier]}: не готово — {', '.join(missing)}")
+            else:
+                print(f"Уровень {titles[tier]}: готов")
         print("Пути выше — личные; перед отправкой в чат замени их на <local>.")
 
     if not args.tier:
