@@ -24,6 +24,7 @@ import check_env  # noqa: E402
 import inspect_plugin  # noqa: E402
 import package  # noqa: E402
 import papyrus_lint  # noqa: E402
+import papyrus_logging  # noqa: E402
 
 
 def touch(path: Path, content: bytes = b"") -> None:
@@ -462,3 +463,57 @@ class BuildTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PapyrusLoggingTests(unittest.TestCase):
+    def test_creates_section_in_empty_file(self) -> None:
+        text, actions = papyrus_logging.enable_logging("")
+        self.assertIn("[Papyrus]", text)
+        self.assertTrue(papyrus_logging.is_enabled(text))
+        self.assertEqual(len(actions), 1)
+
+    def test_keeps_other_keys_and_sections(self) -> None:
+        text = "[General]\nsLanguage=RUSSIAN\n\n[Papyrus]\nbEnableLogging=0\nfPostLoadUpdateTimeMS=500\n"
+        new, _ = papyrus_logging.enable_logging(text)
+        self.assertIn("sLanguage=RUSSIAN", new)
+        self.assertIn("fPostLoadUpdateTimeMS=500", new)
+        self.assertIn("bEnableLogging=1", new)
+        self.assertNotIn("bEnableLogging=0", new)
+        self.assertTrue(papyrus_logging.is_enabled(new))
+
+    def test_second_run_changes_nothing(self) -> None:
+        once, _ = papyrus_logging.enable_logging("[Papyrus]\nbEnableLogging=1\n")
+        twice, actions = papyrus_logging.enable_logging(once)
+        self.assertEqual(once, twice)
+        self.assertIn("изменений нет", actions[0])
+
+    def test_crlf_is_preserved(self) -> None:
+        text = "[Papyrus]\r\nbEnableLogging=1\r\nbEnableTrace=1\r\nbLoadDebugInformation=1\r\n"
+        new, _ = papyrus_logging.enable_logging(text)
+        self.assertEqual(text, new)
+
+    def test_finds_ini_inside_onedrive_documents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            drive = Path(tmp)
+            game_dir = drive / "Documents" / papyrus_logging.GAME_DIR
+            game_dir.mkdir(parents=True)
+            ini = game_dir / "Skyrim.ini"
+            ini.write_text("[Papyrus]\n", encoding="utf-8")
+            documents = papyrus_logging.base_documents(
+                {"USERPROFILE": str(drive / "u"), "OneDrive": str(drive)}
+            )
+            self.assertIn(ini, papyrus_logging.find_inis(documents))
+            self.assertEqual(papyrus_logging.resolve_target(None, documents, create=False), ini)
+
+    def test_ambiguous_inis_are_not_guessed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for documents in (root / "u" / "Documents", root / "OneDrive" / "Documents"):
+                ini = documents / papyrus_logging.GAME_DIR / "Skyrim.ini"
+                ini.parent.mkdir(parents=True)
+                ini.write_text("[Papyrus]\n", encoding="utf-8")
+            documents_dirs = papyrus_logging.base_documents(
+                {"USERPROFILE": str(root / "u"), "OneDrive": str(root / "OneDrive")}
+            )
+            self.assertEqual(len(papyrus_logging.find_inis(documents_dirs)), 2)
+            self.assertIsNone(papyrus_logging.resolve_target(None, documents_dirs, create=False))

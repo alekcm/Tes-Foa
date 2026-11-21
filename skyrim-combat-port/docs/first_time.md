@@ -305,24 +305,41 @@ python tools\enable_plugin.py --status TGCombatPort.esp
 
 ## Шаг 11. Включить логи Papyrus
 
-Логи нужны, чтобы увидеть работу скриптов. Открой блокнотом:
+Логи — это текстовый файл, куда игра пишет, что делают скрипты. Без него мы не увидим, работает мод или нет.
 
-```
-C:\Users\ТВОЁ_ИМЯ\Documents\My Games\Skyrim Special Edition\Skyrim.ini
+Файл настроек `Skyrim.ini` лежит не всегда в `Documents\My Games\Skyrim Special Edition`: если Windows
+хранит «Документы» в OneDrive, путь другой, и вручную такой файл легко не найти (а правка соседнего
+`SkyrimPrefs.ini` ничего не даёт — игра читает настройки Papyrus только из `Skyrim.ini`).
+
+Поэтому не ищем руками, а запускаем скрипт:
+
+```powershell
+python tools\papyrus_logging.py
 ```
 
-Добавь в конец файла:
+Он печатает, какие папки проверял и где нашёл `Skyrim.ini`. Дальше:
+
+```powershell
+python tools\papyrus_logging.py --enable
+```
+
+Ожидаемо: `Работаю с: <путь>`, затем `Логи включены: да` и строка `Лог появится здесь: <путь>`.
+Скрипт делает резервную копию `Skyrim.ini.bak-py` и дописывает в секцию `[Papyrus]`:
 
 ```ini
-[Papyrus]
 bEnableLogging=1
 bEnableTrace=1
 bLoadDebugInformation=1
 ```
 
-Сохрани. Если такая секция уже есть — просто поставь `=1`.
+Если `Skyrim.ini` не нашёлся совсем: скрипт скажет, каких папок нет. Два частых случая:
 
----
+- **«Папки My Games\Skyrim Special Edition нет»** — игра ещё ни разу не запускалась под этим пользователем
+  Windows. Запусти её до главного меню, выйди и повтори команду.
+- **нашлось несколько `Skyrim.ini`** — скрипт не угадывает и просит указать путь:
+  `python tools\papyrus_logging.py --ini "C:\...\Skyrim.ini" --enable`.
+
+Проверка в любой момент: `python tools\papyrus_logging.py --status`.
 
 ## Шаг 12. Первый запуск и первый лог
 

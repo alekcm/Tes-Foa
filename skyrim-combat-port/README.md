@@ -33,7 +33,7 @@ python tools\build.py --name TGCombatPort --version 0.1.0 --plugin build\TGComba
 - [`docs/papyrus_api.md`](docs/papyrus_api.md) — что делают уже написанные скрипты, чего они не делают и что проверять первым.
 - [`docs/papyrus_verification.md`](docs/papyrus_verification.md) — сверка каждой Papyrus-функции с документацией и запасные варианты.
 - `src/papyrus/` — исходники скриптов: пробник animation events, наблюдатель блока, кулдаун паутины, состояние стаи.
-- `tools/` — проверка окружения, линт Papyrus, сборка, упаковка, проверка заголовка плагина, сбор выжимки из Papyrus-лога и проверка ссылок; `tests/` — тесты этих инструментов.
+- `tools/` — проверка окружения, линт Papyrus, сборка, упаковка, проверка заголовка плагина, сбор выжимки из Papyrus-лога, включение логов в Skyrim.ini и проверка ссылок; `tests/` — тесты этих инструментов.
 - [`data/combat_tables_phases_1-2.xlsx`](data/combat_tables_phases_1-2.xlsx) и [`data/phases_1-2_coverage.json`](data/phases_1-2_coverage.json) — восстановленные исследовательские таблицы и coverage.
 - [`docs/how_a_skyrim_mod_works.md`](docs/how_a_skyrim_mod_works.md) — простыми словами: из чего состоит мод, что скачивает игрок с Nexus, чем отличаются варианты реализации и что это значит для требований к игроку.
 - [`BUILD.md`](BUILD.md) — что нужно для сборки на каждом уровне (records → Papyrus → SKSE), что не попадает в Git и как проверить окружение.
