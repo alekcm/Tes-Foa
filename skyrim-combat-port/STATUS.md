@@ -17,10 +17,11 @@
 - Упаковка подготовлена: `tools/package.py` проверяет состав и собирает `dist/<мод>-<версия>.zip`; проверен на тестовой папке, реального архива мода нет.
 - Сборка одной командой: `tools/build.py` (Papyrus → stage → zip). Обвязка проверена на заглушке компилятора; с настоящим `PapyrusCompiler.exe` не запускалась.
 - Исходники в `src/papyrus/`: `TGCP_AnimEventProbe` (пробник animation events), `TGCP_PlayerBlockWatcher` (признак блока игрока), `TGCP_WebSpiderAbility` (кулдаун и каст паутины), `TGCP_PackLeapState` (состояние «один leap на стаю», без принудительного запрета). Ни один не компилировался настоящим компилятором и не запускался в игре.
-- Линт Papyrus (`tools/papyrus_lint.py`) проходит на всех исходниках; тесты инструментов — 30 штук, проходят (`python -m unittest discover -s tests`). Линт не заменяет компилятор.
+- Линт Papyrus (`tools/papyrus_lint.py`) проходит на всех исходниках; тесты инструментов — 36 штук, проходят (`python -m unittest discover -s tests`). Линт не заменяет компилятор.
 - План тестов — `TESTING.md`; инструкция по первым записям в CK — `docs/ck_setup_guide.md`. Оба документа написаны, но ни один шаг не выполнялся.
 - Используемые Papyrus-функции сверены с документацией (`docs/papyrus_verification.md`); `DoCombatSpellCast` не используется, так как для Skyrim не подтверждён.
 - `tools/inspect_plugin.py` читает мастер-файлы и ESL-флаг плагина (проверен на синтетических заголовках); сборка предупреждает о не-ванильных мастер-файлах.
+- Пошаговая инструкция первого запуска — `docs/first_time.md`; включение плагина без менеджера модов — `tools/enable_plugin.py` (пишет резервную копию plugins.txt).
 - Для обратной связи добавлен `tools/collect_logs.py`: вытаскивает из Papyrus-лога строки `[TGCP]` и ошибки в `logs/papyrus_report.txt`; папка `logs/` в `.gitignore`.
 - Цикл совместной работы описан в `docs/workflow.md`: собранный архив агенту не передаётся, нужны исходники, ошибки компиляции и строки лога. Собранный `.esp` рекомендуется коммитить в `src/plugin/` (см. README там же).
 - `tools/check_docs.py` проверяет локальные ссылки в Markdown; им найдена и исправлена битая ссылка на книгу в `docs/tainted-grail-skyrim-combat-research.md`. CI-workflow `.github/workflows/tools-tests.yml` запускает тесты, линт Papyrus и проверку ссылок.

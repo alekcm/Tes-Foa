@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import build  # noqa: E402
 import check_docs  # noqa: E402
 import collect_logs  # noqa: E402
+import enable_plugin  # noqa: E402
 import check_env  # noqa: E402
 import inspect_plugin  # noqa: E402
 import package  # noqa: E402
@@ -161,6 +162,38 @@ class InspectPluginTests(unittest.TestCase):
             found = inspect_plugin.candidates(archive_path)
             self.assertEqual(len(found), 1)
             self.assertEqual(found[0][0], "TGCombatPort.esp")
+
+
+class EnablePluginTests(unittest.TestCase):
+    BASE = ["Skyrim.esm", "*Update.esm", "*Dawnguard.esm"]
+
+    def test_enable_appends_plugin(self) -> None:
+        lines, changed = enable_plugin.set_enabled(self.BASE, "TGCombatPort.esp", True)
+        self.assertTrue(changed)
+        self.assertEqual(lines[-1], "*TGCombatPort.esp")
+
+    def test_enable_marks_existing_line(self) -> None:
+        lines, changed = enable_plugin.set_enabled(self.BASE + ["TGCombatPort.esp"], "TGCombatPort.esp", True)
+        self.assertTrue(changed)
+        self.assertEqual(lines[-1], "*TGCombatPort.esp")
+
+    def test_enable_is_idempotent(self) -> None:
+        lines, changed = enable_plugin.set_enabled(self.BASE + ["*TGCombatPort.esp"], "tgcombatport.esp", True)
+        self.assertFalse(changed)
+
+    def test_disable_removes_star_but_keeps_line(self) -> None:
+        lines, changed = enable_plugin.set_enabled(self.BASE + ["*TGCombatPort.esp"], "TGCombatPort.esp", False)
+        self.assertTrue(changed)
+        self.assertEqual(lines[-1], "TGCombatPort.esp")
+
+    def test_disable_unknown_plugin_changes_nothing(self) -> None:
+        lines, changed = enable_plugin.set_enabled(self.BASE, "Missing.esp", False)
+        self.assertFalse(changed)
+        self.assertEqual(lines, self.BASE)
+
+    def test_is_enabled_is_case_insensitive(self) -> None:
+        self.assertTrue(enable_plugin.is_enabled(self.BASE + ["*TGCombatPort.esp"], "tgcombatport.esp"))
+        self.assertFalse(enable_plugin.is_enabled(self.BASE + ["TGCombatPort.esp"], "TGCombatPort.esp"))
 
 
 class CollectLogsTests(unittest.TestCase):
