@@ -1,0 +1,22 @@
+* text=auto
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.psc text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.cmake text eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.xlsx binary
+*.esp binary
+*.esm binary
+*.esl binary
+*.pex binary
+*.dll binary
+*.hkx binary
+*.nif binary
+*.dds binary
+*.wav binary
+*.mp3 binary

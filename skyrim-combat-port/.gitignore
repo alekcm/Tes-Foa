@@ -1,0 +1,40 @@
+# Local machine / user-specific configuration
+*.local
+*.user
+.env
+.env.*
+!.env.example
+SETUP.private.md
+
+# Game, mod-manager, and user data — never put the installation in this repo
+Skyrim Special Edition/
+SkyrimSE.exe
+Skyrim.ccc
+Data/
+Overwrite/
+MO2/
+ModOrganizer/
+Vortex/
+Saves/
+*.ess
+*.skse
+*.bak
+
+# Generated builds and temporary exports
+build/
+dist/
+out/
+release/
+*.pex
+*.dll
+*.pdb
+*.log
+*.tmp
+*.cache
+
+# Common editor/OS files
+.vs/
+.vscode/settings.local.json
+.idea/
+.DS_Store
+Thumbs.db
