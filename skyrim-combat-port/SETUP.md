@@ -5,11 +5,12 @@
 ## Игра
 
 - Edition: Skyrim Special Edition (SE) — сообщил пользователь; «со всеми дополнениями» (2026-11-21)
-- Store/platform: `UNKNOWN` — пользователь сообщил редакцию, но не магазин/платформу
-- Runtime/game version (например, `1.x.x.x`): `UNKNOWN` — точная версия исполняемого файла не сообщена
-- Где прочитана версия (свойство `SkyrimSE.exe`, launcher, лог): `UNKNOWN`
+- Store/platform: Steam; игровая библиотека на отдельном диске (`A:`) — путь в Git не записываем
+- Runtime/game version: `1.7.104.0` (получено `tools/check_env.py` из свойств `SkyrimSE.exe`, 2026-11-21)
+- Где прочитана версия: свойства файла `SkyrimSE.exe` через PowerShell в `tools/check_env.py`
 - Язык игры: `UNKNOWN`
-- DLC: пользователь сообщил «со всеми дополнениями»; трактуем как Dawnguard, Hearthfire и Dragonborn (точный список плагинов не экспортирован)
+- DLC: Dawnguard, HearthFires, Dragonborn. Файл Hearthfire в игре называется `HearthFires.esm`; первая проверка
+  не находила его из-за написания — инструмент исправлен, ожидается 3/3
 - Creation Club/AE content: `UNKNOWN` — не подтверждено, какие именно CC-пакеты установлены
 - Можно ли откатить/заморозить автообновление для тестового профиля: `UNKNOWN`
 
@@ -25,7 +26,10 @@ Windows PowerShell для чтения версии (замени путь на 
 ## Разработка и запуск
 
 - Windows version / архитектура: `UNKNOWN`
-- Creation Kit: `не установлен` / `установлен, версия/дата неизвестны` / `установлен, версия: ...` — выбрать фактический вариант. Если его нет, так и написать; ставить заранее не нужно. Агент должен определить по согласованному способу реализации, нужен ли CK.
+- Creation Kit: установлен (найден `CreationKit.exe` рядом с игрой); точная версия не записана
+- PapyrusCompiler.exe: найден (`Papyrus Compiler` в папке игры)
+- `TESV_Papyrus_Flags.flags`: на диске не найден; `tools/check_env.py` ищет его внутри `Data/Scripts.zip` и `build.py` умеет извлекать оттуда
+- SKSE: не установлен; если понадобится, версия должна точно соответствовать runtime `1.7.104.0`
 - xEdit установлен? версия: `UNKNOWN`
 - Mod manager: `UNKNOWN`
 - Отдельный тестовый профиль и минимальный load order: `UNKNOWN`

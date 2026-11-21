@@ -32,6 +32,7 @@ VANILLA_MASTERS = {
     "skyrim.esm",
     "update.esm",
     "dawnguard.esm",
+    "hearthfires.esm",
     "hearthfire.esm",
     "dragonborn.esm",
 }

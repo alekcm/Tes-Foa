@@ -140,6 +140,10 @@ class InspectPluginTests(unittest.TestCase):
         self.assertEqual(report["unexpected_masters"], [])
         self.assertFalse(report["esl"])
 
+    def test_hearthfires_master_is_vanilla(self) -> None:
+        report = inspect_plugin.describe(make_plugin(["Skyrim.esm", "HearthFires.esm"]))
+        self.assertEqual(report["unexpected_masters"], [])
+
     def test_reports_foreign_master_and_esl(self) -> None:
         report = inspect_plugin.describe(make_plugin(["Skyrim.esm", "SomeOtherMod.esp"], esl=True))
         self.assertIn("SomeOtherMod.esp", report["unexpected_masters"])
@@ -281,6 +285,32 @@ class CheckEnvTests(unittest.TestCase):
             self.assertEqual(rows["dlc"]["status"], "ok")
             self.assertIn("3/3", rows["dlc"]["detail"])
             self.assertEqual(rows["editor"]["status"], "missing")
+
+    def test_hearthfires_spelling_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game = Path(tmp) / "game"
+            touch(game / "SkyrimSE.exe")
+            for name in ("Skyrim.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm"):
+                touch(game / "Data" / name)
+            rows = {row["key"]: row for row in check_env.build_report({"SKYRIM_DIR": str(game)})}
+            self.assertEqual(rows["dlc"]["status"], "ok")
+            self.assertIn("3/3", rows["dlc"]["detail"])
+
+    def test_flags_inside_scripts_zip_are_detected_and_extracted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game = Path(tmp) / "game"
+            data = game / "Data"
+            touch(data / "Skyrim.esm")
+            with zipfile.ZipFile(data / "Scripts.zip", "w") as archive:
+                archive.writestr("Scripts/TESV_Papyrus_Flags.flags", "flags")
+            rows = {row["key"]: row for row in check_env.build_report({"SKYRIM_DIR": str(game)})}
+            self.assertEqual(rows["papyrus_flags"]["status"], "ok")
+            self.assertIn("Scripts.zip", rows["papyrus_flags"]["detail"])
+
+            dest = Path(tmp) / "build" / "tools"
+            extracted = check_env.extract_flags_from_scripts_zip(data, dest)
+            self.assertIsNotNone(extracted)
+            self.assertEqual(extracted.read_text(encoding="utf-8"), "flags")
 
     def test_missing_dlc_is_reported(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

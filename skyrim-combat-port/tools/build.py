@@ -48,7 +48,11 @@ def locate(env: dict[str, str]) -> tuple[Path | None, Path | None, Path | None]:
 
     flags = as_path(env.get("PAPYRUS_FLAGS", ""))
     if not (flags and flags.is_file()):
-        flags = find_in_dirs(("TESV_Papyrus_Flags.flags",), (ck_dir, game_dir), max_depth=4)
+        flags = find_in_dirs((check_env.FLAGS_NAME,), (ck_dir, game_dir), max_depth=4)
+    if flags is None and game_dir is not None:
+        flags = check_env.extract_flags_from_scripts_zip(game_dir / "Data", ROOT / "build" / "tools")
+        if flags is not None:
+            print(f"Флаги Papyrus извлечены из Scripts.zip: {flags}")
 
     sources = as_path(env.get("PAPYRUS_SOURCE", ""))
     if not (sources and sources.is_dir()):

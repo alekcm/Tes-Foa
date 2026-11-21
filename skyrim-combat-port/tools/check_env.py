@@ -19,12 +19,19 @@ import os
 import re
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent.parent
 
-DLC = ("Dawnguard.esm", "Hearthfire.esm", "Dragonborn.esm")
+# Отображаемое имя -> возможные имена файла. У DLC Hearthfire файл называется HearthFires.esm.
+DLC = (
+    ("Dawnguard", ("Dawnguard.esm",)),
+    ("HearthFires", ("HearthFires.esm", "Hearthfire.esm")),
+    ("Dragonborn", ("Dragonborn.esm",)),
+)
+FLAGS_NAME = "TESV_Papyrus_Flags.flags"
 TIER_REQUIRES = {
     "plugin": ("skyrim", "data", "dlc"),
     "papyrus": ("skyrim", "data", "dlc", "editor", "papyrus_compiler", "papyrus_flags", "papyrus_sources"),
@@ -104,6 +111,39 @@ def autodetect_game(roots: list[Path] | None = None) -> Path | None:
     return None
 
 
+def flags_entry_in_scripts_zip(data_dir: Path | None) -> str | None:
+    """Ищет TESV_Papyrus_Flags.flags внутри Data/Scripts.zip."""
+    if data_dir is None:
+        return None
+    zip_path = data_dir / "Scripts.zip"
+    if not zip_path.is_file():
+        return None
+    try:
+        with zipfile.ZipFile(zip_path) as archive:
+            for name in archive.namelist():
+                if Path(name).name.lower() == FLAGS_NAME.lower():
+                    return name
+    except (zipfile.BadZipFile, OSError):
+        return None
+    return None
+
+
+def extract_flags_from_scripts_zip(data_dir: Path | None, dest_dir: Path) -> Path | None:
+    """Извлекает flags из Scripts.zip в dest_dir и возвращает путь к файлу."""
+    entry = flags_entry_in_scripts_zip(data_dir)
+    if entry is None or data_dir is None:
+        return None
+    zip_path = data_dir / "Scripts.zip"
+    dest = dest_dir / FLAGS_NAME
+    try:
+        with zipfile.ZipFile(zip_path) as archive:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(archive.read(entry))
+    except (zipfile.BadZipFile, OSError, KeyError):
+        return None
+    return dest
+
+
 def find_in_dirs(names: Iterable[str], roots: Iterable[Path | None], max_depth: int = 3) -> Path | None:
     """Ищет файл по имени в корнях, не глубже max_depth."""
     for root in roots:
@@ -173,12 +213,16 @@ def build_report(env: dict[str, str]) -> list[dict[str, str]]:
     data_dir = game_dir / "Data" if game_dir else None
     add("data", "Data/Skyrim.esm", data_dir / "Skyrim.esm" if data_dir and (data_dir / "Skyrim.esm").is_file() else None)
 
-    found_dlc = [name for name in DLC if data_dir and (data_dir / name).is_file()]
-    missing_dlc = [name for name in DLC if name not in found_dlc]
+    found_dlc = [
+        display
+        for display, names in DLC
+        if data_dir and any((data_dir / name).is_file() for name in names)
+    ]
+    missing_dlc = [display for display, _ in DLC if display not in found_dlc]
     rows.append(
         {
             "key": "dlc",
-            "title": "Dawnguard / Hearthfire / Dragonborn",
+            "title": "Dawnguard / HearthFires / Dragonborn",
             "status": "ok" if not missing_dlc else "missing",
             "detail": f"найдено {len(found_dlc)}/3"
             + (f"; нет: {', '.join(missing_dlc)}" if missing_dlc else ""),
@@ -210,8 +254,22 @@ def build_report(env: dict[str, str]) -> list[dict[str, str]]:
 
     flags = as_path(env.get("PAPYRUS_FLAGS", ""))
     if not (flags and flags.is_file()):
-        flags = find_in_dirs(("TESV_Papyrus_Flags.flags",), (ck_dir, game_dir), max_depth=4)
-    add("papyrus_flags", "TESV_Papyrus_Flags.flags", flags)
+        flags = find_in_dirs((FLAGS_NAME,), (ck_dir, game_dir), max_depth=4)
+    if flags:
+        add("papyrus_flags", FLAGS_NAME, flags)
+    else:
+        inside_zip = flags_entry_in_scripts_zip(data_dir)
+        if inside_zip:
+            rows.append(
+                {
+                    "key": "papyrus_flags",
+                    "title": FLAGS_NAME,
+                    "status": "ok",
+                    "detail": f"внутри {data_dir / 'Scripts.zip'} ({inside_zip}); сборка извлечёт файл сама",
+                }
+            )
+        else:
+            add("papyrus_flags", FLAGS_NAME, None)
 
     source = as_path(env.get("PAPYRUS_SOURCE", ""))
     candidates = [source] if source else []

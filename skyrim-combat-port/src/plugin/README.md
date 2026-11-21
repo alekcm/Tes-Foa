@@ -18,7 +18,7 @@
   ```powershell
   python tools\inspect_plugin.py src\plugin\TGCombatPort.esp --strict
   ```
-  Не должно быть мастер-файлов, кроме `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`, `Hearthfire.esm`,
+  Не должно быть мастер-файлов, кроме `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`, `HearthFires.esm`,
   `Dragonborn.esm`.
 
 Сборка с этим плагином:

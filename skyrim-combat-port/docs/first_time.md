@@ -40,6 +40,9 @@ python --version
 
 Проверка: в папке `skyrim-combat-port` видны `README.md`, `docs`, `src`, `tools`.
 
+Если проект уже скачивался раньше, а я обновил инструменты, скачай ZIP заново и распакуй **поверх** той же папки:
+файл `.env` при этом сохранится, потому что его нет в архиве.
+
 ---
 
 ## Шаг 2. Проверить, что инструменты на месте
@@ -122,7 +125,8 @@ python tools\build.py --name TGCombatPort --version 0.1.0 --skip-package 2>&1 | 
 
 1. Steam → Библиотека → Инструменты → **Skyrim Special Edition Creation Kit** → Запустить.
 2. Появится окно со списком файлов игры (Data). Отметь галочками:
-   `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`, `Hearthfire.esm`, `Dragonborn.esm`.
+   `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`, `HearthFires.esm`, `Dragonborn.esm`.
+   Обрати внимание: файл дополнения Hearthfire называется именно `HearthFires.esm`.
 3. **Не делай `Skyrim.esm` активным файлом.** Активным будет наш новый плагин, который мы создадим.
 4. Нажми **OK** и подожди. Загрузка может идти несколько минут, окно может «не отвечать» — это нормально.
 

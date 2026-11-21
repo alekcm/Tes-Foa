@@ -12,7 +12,7 @@
 1. Поставить Creation Kit из Steam (библиотека → инструменты → Skyrim Special Edition Creation Kit).
 2. В Steam у игры должен быть включён язык, совпадающий с игрой; иначе CK может ругаться на строки.
 3. Запустить CK, дождаться списка файлов. Отметить `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`,
-   `Hearthfire.esm`, `Dragonborn.esm`.
+   `HearthFires.esm`, `Dragonborn.esm`.
 4. **Не** делать активным `Skyrim.esm`. Нажать OK, дождаться загрузки, затем `File → Save` и сохранить новый
    плагин как `TGCombatPort.esp`. Дальше все записи создаём в нём.
 5. Проверка: плагин появился в `Data` игры, а игра запускается с ним без ошибок.

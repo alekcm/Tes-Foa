@@ -13,7 +13,7 @@
 
 - Плагин-носитель: `TGCombatPort.esp` (имя рабочее). Префикс всех новых EditorID — `TGCP_`, чтобы не пересекаться
   с другими модами.
-- Мастер-файлы: `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`, `Hearthfire.esm`, `Dragonborn.esm`. Creation Club —
+- Мастер-файлы: `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`, `HearthFires.esm`, `Dragonborn.esm`. Creation Club —
   отдельным опциональным плагином, не в основном.
 - Существующие ванильные записи не перезаписываем, если можно сделать новую: правка `CombatStyle` или расы
   ломает совместимость с другими модами.
