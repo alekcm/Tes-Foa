@@ -291,6 +291,16 @@ python tools\enable_plugin.py --status TGCombatPort.esp
 
 > Позже, когда перейдём на MO2, включать плагин будешь в менеджере модов, а не этой командой.
 
+**Почему нельзя включить плагин внутри игры.** В Skyrim Special Edition нет списка локальных плагинов
+ни в лаунчере (пункт **Data Files** был только в старой Skyrim 2011 года), ни в главном меню: пункт
+**Creations** — это магазин Bethesda.net, локальные `.esp` он не показывает
+([Reddit](https://www.reddit.com/r/skyrim/comments/1ai2ht4/mod_menu_gone/),
+[Nexus](https://forums.nexusmods.com/topic/4989205-data-files-option-missing-from-launcher/)).
+Консоль в игре тоже не умеет включать плагины. Список включённых плагинов — это текстовый файл
+`%LOCALAPPDATA%\Skyrim Special Edition\plugins.txt`; его правят либо вручную, либо скриптом
+(`enable_plugin.py`), либо менеджером модов. Файл `.esp`, положенный в `Data`, сам по себе не включается,
+а копия в `src\plugin\` — просто резервная копия в Git, на запуск игры она не влияет.
+
 ---
 
 ## Шаг 11. Включить логи Papyrus
