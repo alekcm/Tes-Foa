@@ -17,6 +17,7 @@
 - [`data/combat_tables_phases_1-2.xlsx`](data/combat_tables_phases_1-2.xlsx) и [`data/phases_1-2_coverage.json`](data/phases_1-2_coverage.json) — восстановленные исследовательские таблицы и coverage.
 - [`docs/how_a_skyrim_mod_works.md`](docs/how_a_skyrim_mod_works.md) — простыми словами: из чего состоит мод, что скачивает игрок с Nexus, чем отличаются варианты реализации и что это значит для требований к игроку.
 - [`BUILD.md`](BUILD.md) — что нужно для сборки на каждом уровне (records → Papyrus → SKSE), что не попадает в Git и как проверить окружение.
+- [`RELEASING.md`](RELEASING.md) — путь от исходников до обычного zip: упаковка, проверка установки, GitHub Releases/Nexus, разбор проблем.
 - [`SETUP.md`](SETUP.md) — заполняемая карточка твоей конкретной версии игры и среды разработки.
 - [`DEPENDENCIES.md`](DEPENDENCIES.md) — здесь фиксируются только реально выбранные инструменты и версии.
 - [`STATUS.md`](STATUS.md) — что спроектировано, реализовано, собрано и реально проверено.
