@@ -31,7 +31,9 @@ DLC = (
     ("HearthFires", ("HearthFires.esm", "Hearthfire.esm")),
     ("Dragonborn", ("Dragonborn.esm",)),
 )
-FLAGS_NAME = "TESV_Papyrus_Flags.flags"
+# В Skyrim SE файл называется .flg; .flags встречается в старых инструкциях.
+FLAGS_NAMES = ("TESV_Papyrus_Flags.flg", "TESV_Papyrus_Flags.flags")
+FLAGS_NAME = FLAGS_NAMES[0]
 TIER_REQUIRES = {
     "plugin": ("skyrim", "data", "dlc"),
     "papyrus": ("skyrim", "data", "dlc", "editor", "papyrus_compiler", "papyrus_flags", "papyrus_sources"),
@@ -112,7 +114,7 @@ def autodetect_game(roots: list[Path] | None = None) -> Path | None:
 
 
 def flags_entry_in_scripts_zip(data_dir: Path | None) -> str | None:
-    """Ищет TESV_Papyrus_Flags.flags внутри Data/Scripts.zip."""
+    """Ищет TESV_Papyrus_Flags.flg внутри Data/Scripts.zip."""
     if data_dir is None:
         return None
     zip_path = data_dir / "Scripts.zip"
@@ -121,7 +123,7 @@ def flags_entry_in_scripts_zip(data_dir: Path | None) -> str | None:
     try:
         with zipfile.ZipFile(zip_path) as archive:
             for name in archive.namelist():
-                if Path(name).name.lower() == FLAGS_NAME.lower():
+                if Path(name).name.lower() in {flag.lower() for flag in FLAGS_NAMES}:
                     return name
     except (zipfile.BadZipFile, OSError):
         return None
@@ -134,7 +136,7 @@ def extract_flags_from_scripts_zip(data_dir: Path | None, dest_dir: Path) -> Pat
     if entry is None or data_dir is None:
         return None
     zip_path = data_dir / "Scripts.zip"
-    dest = dest_dir / FLAGS_NAME
+    dest = dest_dir / Path(entry).name
     try:
         with zipfile.ZipFile(zip_path) as archive:
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -182,14 +184,15 @@ def read_exe_version(exe: Path) -> str:
 
 
 def diagnose_flags(game_dir: Path | None) -> int:
-    """Показывает, где вообще может лежать TESV_Papyrus_Flags.flags."""
+    """Показывает, где вообще может лежать TESV_Papyrus_Flags.flg."""
     if game_dir is None or not game_dir.is_dir():
         print("Не знаю папку игры: заполни SKYRIM_DIR в .env.")
         return 2
 
-    print(f"Ищу *.flags в {game_dir} ...")
+    print(f"Ищу *.flg и *.flags в {game_dir} ...")
     found = []
-    for path in game_dir.rglob("*.flags"):
+    candidates = list(game_dir.rglob("*.flg")) + list(game_dir.rglob("*.flags"))
+    for path in candidates:
         found.append(path)
         if len(found) >= 20:
             break
@@ -197,7 +200,7 @@ def diagnose_flags(game_dir: Path | None) -> int:
         for path in found:
             print(f"  найден: {path}")
     else:
-        print("  на диске не найдено ни одного *.flags")
+        print("  на диске не найдено ни одного *.flg / *.flags")
 
     data_dir = game_dir / "Data"
     for archive_name in ("Scripts.zip", "Scripts.bsa"):
@@ -299,7 +302,7 @@ def build_report(env: dict[str, str]) -> list[dict[str, str]]:
 
     flags = as_path(env.get("PAPYRUS_FLAGS", ""))
     if not (flags and flags.is_file()):
-        flags = find_in_dirs((FLAGS_NAME,), (ck_dir, game_dir), max_depth=4)
+        flags = find_in_dirs(FLAGS_NAMES, (ck_dir, game_dir), max_depth=5)
     if flags:
         add("papyrus_flags", FLAGS_NAME, flags)
     else:
@@ -362,7 +365,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Проверить локальное окружение сборки Skyrim-мода.")
     parser.add_argument("--tier", choices=sorted(TIER_REQUIRES), help="уровень сборки, для которого важен код возврата")
     parser.add_argument("--json", action="store_true", help="вывести отчёт в JSON")
-    parser.add_argument("--diagnose-flags", action="store_true", help="искать TESV_Papyrus_Flags.flags по папке игры")
+    parser.add_argument("--diagnose-flags", action="store_true", help="искать TESV_Papyrus_Flags.flg по папке игры")
     args = parser.parse_args()
 
     try:

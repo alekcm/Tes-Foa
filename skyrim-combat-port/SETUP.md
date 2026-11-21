@@ -28,7 +28,7 @@ Windows PowerShell для чтения версии (замени путь на 
 - Windows version / архитектура: `UNKNOWN`
 - Creation Kit: установлен (найден `CreationKit.exe` рядом с игрой); точная версия не записана
 - PapyrusCompiler.exe: найден (`Papyrus Compiler` в папке игры)
-- `TESV_Papyrus_Flags.flags`: на диске не найден; `tools/check_env.py` ищет его внутри `Data/Scripts.zip` и `build.py` умеет извлекать оттуда
+- `TESV_Papyrus_Flags.flg`: появляется в `Data\Source\Scripts` после первого запуска CK; `tools/check_env.py` ищет его по папке игры и внутри `Data/Scripts.zip`, `build.py` умеет извлекать из архива
 - SKSE: не установлен; если понадобится, версия должна точно соответствовать runtime `1.7.104.0`
 - xEdit установлен? версия: `UNKNOWN`
 - Mod manager: `UNKNOWN`

@@ -14,7 +14,7 @@
 | Уровень | Что собирается | Что нужно на машине | Нужен ли Git-конфиг | Статус |
 |---|---|---|---|---|
 | A. Record-only plugin | `.esp`/`.esl` с расами, CombatStyle, perks, шаблонами NPC, leveled lists | Skyrim SE + DLC, Creation Kit или xEdit (SSEEdit) | Да, когда появится исходник | Не начат |
-| B. Papyrus | `.pex` скриптов (group gate для волков, реакция на блок, тайминги) | Уровень A + `PapyrusCompiler.exe` + `TESV_Papyrus_Flags.flags` + исходные скрипты игры (`Scripts.zip`/`Scripts/`) | Да: `src/papyrus/` + команда компиляции | Не начат |
+| B. Papyrus | `.pex` скриптов (group gate для волков, реакция на блок, тайминги) | Уровень A + `PapyrusCompiler.exe` + `TESV_Papyrus_Flags.flg` + исходные скрипты игры (`Scripts.zip`/`Scripts/`) | Да: `src/papyrus/` + команда компиляции | Не начат |
 | C. SKSE plugin | `.dll` на C++ | Уровень A + SKSE под точный runtime + Visual Studio + запинованный CommonLibSSE-NG + CMake/vcpkg | Да: `src/native/` + `CMakeLists.txt` | Не начат, и не нужен, пока прототип не докажет обратное |
 
 Уровень A не требует запуска игры и компилятора — только редактор плагина. Поэтому первый реальный
@@ -68,7 +68,7 @@
 ```powershell
 & "C:\путь\к\Papyrus Compiler\PapyrusCompiler.exe" `
   "src\papyrus\MyScript.psc" `
-  -f="TESV_Papyrus_Flags.flags" `
+  -f="TESV_Papyrus_Flags.flg" `
   -i="C:\путь\к\Data\Scripts\Source" `
   -o="build\Scripts"
 ```

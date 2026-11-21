@@ -2,7 +2,7 @@
 """Одна команда сборки мода: Papyrus -> stage -> готовый zip.
 
 Что делает:
-  1. Находит PapyrusCompiler.exe и TESV_Papyrus_Flags.flags (по .env или поиском).
+  1. Находит PapyrusCompiler.exe и TESV_Papyrus_Flags.flg (по .env или поиском).
   2. Компилирует все src/papyrus/*.psc в build/stage/Scripts.
   3. Копирует плагин (--plugin) и ресурсы (assets/) в stage.
   4. Вызывает tools/package.py и получает dist/<мод>-<версия>.zip.
@@ -48,7 +48,7 @@ def locate(env: dict[str, str]) -> tuple[Path | None, Path | None, Path | None]:
 
     flags = as_path(env.get("PAPYRUS_FLAGS", ""))
     if not (flags and flags.is_file()):
-        flags = find_in_dirs((check_env.FLAGS_NAME,), (ck_dir, game_dir), max_depth=4)
+        flags = find_in_dirs(check_env.FLAGS_NAMES, (ck_dir, game_dir), max_depth=5)
     if flags is None and game_dir is not None:
         flags = check_env.extract_flags_from_scripts_zip(game_dir / "Data", ROOT / "build" / "tools")
         if flags is not None:

@@ -296,13 +296,22 @@ class CheckEnvTests(unittest.TestCase):
             self.assertEqual(rows["dlc"]["status"], "ok")
             self.assertIn("3/3", rows["dlc"]["detail"])
 
+    def test_finds_flg_in_source_scripts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game = Path(tmp) / "game"
+            touch(game / "SkyrimSE.exe")
+            touch(game / "Data" / "Source" / "Scripts" / "TESV_Papyrus_Flags.flg")
+            rows = {row["key"]: row for row in check_env.build_report({"SKYRIM_DIR": str(game)})}
+            self.assertEqual(rows["papyrus_flags"]["status"], "ok")
+            self.assertIn(".flg", rows["papyrus_flags"]["detail"])
+
     def test_flags_inside_scripts_zip_are_detected_and_extracted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             game = Path(tmp) / "game"
             data = game / "Data"
             touch(data / "Skyrim.esm")
             with zipfile.ZipFile(data / "Scripts.zip", "w") as archive:
-                archive.writestr("Scripts/TESV_Papyrus_Flags.flags", "flags")
+                archive.writestr("Scripts/TESV_Papyrus_Flags.flg", "flags")
             rows = {row["key"]: row for row in check_env.build_report({"SKYRIM_DIR": str(game)})}
             self.assertEqual(rows["papyrus_flags"]["status"], "ok")
             self.assertIn("Scripts.zip", rows["papyrus_flags"]["detail"])
@@ -378,7 +387,7 @@ class BuildTests(unittest.TestCase):
             ck = Path(tmp) / "ck"
             touch(ck / "CreationKit.exe")
             touch(ck / "Papyrus Compiler" / "PapyrusCompiler.exe")
-            touch(ck / "Papyrus Compiler" / "TESV_Papyrus_Flags.flags")
+            touch(ck / "Papyrus Compiler" / "TESV_Papyrus_Flags.flg")
             compiler, flags, _ = build.locate({"CK_DIR": str(ck)})
             self.assertIsNotNone(compiler)
             self.assertEqual(compiler.name, "PapyrusCompiler.exe")
@@ -412,7 +421,7 @@ class BuildTests(unittest.TestCase):
                 encoding="utf-8",
             )
             compiler.chmod(0o755)
-            flags = work / "TESV_Papyrus_Flags.flags"
+            flags = work / "TESV_Papyrus_Flags.flg"
             flags.write_text("", encoding="utf-8")
 
             plugin = work / "TGCombatPort.esp"
