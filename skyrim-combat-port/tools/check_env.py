@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -64,6 +65,45 @@ def as_path(value: str) -> Path | None:
     return Path(os.path.expandvars(value)).expanduser()
 
 
+def parse_library_folders(text: str) -> list[Path]:
+    """Достаёт пути библиотек Steam из libraryfolders.vdf."""
+    paths = []
+    for raw in re.findall(r'"path"\s+"([^"]+)"', text):
+        paths.append(Path(raw.replace("\\\\", "\\")))
+    return paths
+
+
+def steam_library_roots() -> list[Path]:
+    """Корни библиотек Steam из реестра Windows и libraryfolders.vdf."""
+    if sys.platform != "win32":
+        return []
+    roots: list[Path] = []
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as key:
+            steam_path = Path(winreg.QueryValueEx(key, "SteamPath")[0])
+    except (OSError, ImportError):
+        return roots
+    roots.append(steam_path)
+    for vdf in (steam_path / "steamapps" / "libraryfolders.vdf", steam_path / "config" / "libraryfolders.vdf"):
+        if vdf.is_file():
+            try:
+                roots.extend(parse_library_folders(vdf.read_text(encoding="utf-8", errors="replace")))
+            except OSError:
+                pass
+    return roots
+
+
+def autodetect_game(roots: list[Path] | None = None) -> Path | None:
+    """Ищет папку Skyrim SE в библиотеках Steam."""
+    for root in roots if roots is not None else steam_library_roots():
+        candidate = root / "steamapps" / "common" / "Skyrim Special Edition"
+        if (candidate / "SkyrimSE.exe").is_file():
+            return candidate
+    return None
+
+
 def find_in_dirs(names: Iterable[str], roots: Iterable[Path | None], max_depth: int = 3) -> Path | None:
     """Ищет файл по имени в корнях, не глубже max_depth."""
     for root in roots:
@@ -108,6 +148,18 @@ def build_report(env: dict[str, str]) -> list[dict[str, str]]:
     skse_dir = as_path(env.get("SKSE_DIR", ""))
 
     rows: list[dict[str, str]] = []
+    if game_dir is None or not (game_dir / "SkyrimSE.exe").is_file():
+        detected = autodetect_game()
+        if detected is not None:
+            game_dir = detected
+            rows.append(
+                {
+                    "key": "autodetect",
+                    "title": "Папка игры найдена автоматически",
+                    "status": "info",
+                    "detail": f"{detected} — впиши этот путь в SKYRIM_DIR в .env",
+                }
+            )
 
     def add(key: str, title: str, path: Path | None, detail: str = "") -> None:
         if path is not None and path.exists():
@@ -162,15 +214,25 @@ def build_report(env: dict[str, str]) -> list[dict[str, str]]:
     add("papyrus_flags", "TESV_Papyrus_Flags.flags", flags)
 
     source = as_path(env.get("PAPYRUS_SOURCE", ""))
-    if source and source.is_dir():
-        has_psc = any(source.glob("*.psc"))
-        add("papyrus_sources", "Исходные скрипты игры", source if has_psc else None, "нет *.psc" if not has_psc else "")
-    elif data_dir and (data_dir / "Scripts.zip").is_file():
-        add("papyrus_sources", "Исходные скрипты игры", data_dir / "Scripts.zip")
-    elif data_dir and (data_dir / "Scripts").is_dir():
-        add("papyrus_sources", "Исходные скрипты игры", data_dir / "Scripts")
-    else:
-        add("papyrus_sources", "Исходные скрипты игры", None, "нет Scripts.zip и нет папки Scripts")
+    candidates = [source] if source else []
+    if data_dir:
+        candidates.extend(
+            [
+                data_dir / "Scripts" / "Source",
+                data_dir / "Scripts",
+                data_dir / "Source" / "Scripts",
+                data_dir / "Scripts.zip",
+            ]
+        )
+    found_source = None
+    for candidate in candidates:
+        if candidate and candidate.is_file():
+            found_source = candidate
+            break
+        if candidate and candidate.is_dir() and any(candidate.glob("*.psc")):
+            found_source = candidate
+            break
+    add("papyrus_sources", "Исходные скрипты игры", found_source, "нет Scripts.zip и нет *.psc в Data/Scripts")
 
     skse_loader = find_in_dirs(("skse64_loader.exe",), (skse_dir, game_dir), max_depth=2)
     add("skse", "skse64_loader.exe", skse_loader)

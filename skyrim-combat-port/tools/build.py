@@ -23,6 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import check_env
 import inspect_plugin
 import papyrus_lint
 from check_env import load_env, as_path, find_in_dirs
@@ -34,6 +35,11 @@ STAGE = ROOT / "build" / "stage"
 
 def locate(env: dict[str, str]) -> tuple[Path | None, Path | None, Path | None]:
     game_dir = as_path(env.get("SKYRIM_DIR", ""))
+    if game_dir is None or not (game_dir / "SkyrimSE.exe").is_file():
+        detected = check_env.autodetect_game()
+        if detected is not None:
+            print(f"Папка игры найдена автоматически: {detected}")
+            game_dir = detected
     ck_dir = as_path(env.get("CK_DIR", ""))
 
     compiler = as_path(env.get("PAPYRUS_COMPILER", ""))
@@ -48,9 +54,14 @@ def locate(env: dict[str, str]) -> tuple[Path | None, Path | None, Path | None]:
     if not (sources and sources.is_dir()):
         sources = None
         if game_dir:
-            candidate = game_dir / "Data" / "Scripts"
-            if candidate.is_dir() and any(candidate.glob("*.psc")):
-                sources = candidate
+            for candidate in (
+                game_dir / "Data" / "Scripts" / "Source",
+                game_dir / "Data" / "Scripts",
+                game_dir / "Data" / "Source" / "Scripts",
+            ):
+                if candidate.is_dir() and any(candidate.glob("*.psc")):
+                    sources = candidate
+                    break
     return compiler, flags, sources
 
 

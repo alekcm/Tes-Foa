@@ -243,6 +243,30 @@ class CheckDocsTests(unittest.TestCase):
         self.assertIn("missing.md", problems[0])
 
 
+class SteamDetectionTests(unittest.TestCase):
+    def test_parse_library_folders(self) -> None:
+        text = (
+            '"libraryfolders"\n'
+            '{\n'
+            '  "0"\n  {\n    "path" "C:/Program Files (x86)/Steam"\n  }\n'
+            '  "1"\n  {\n    "path" "D:/SteamLibrary"\n  }\n'
+            '}\n'
+        )
+        paths = check_env.parse_library_folders(text)
+        self.assertEqual(paths, [Path("C:/Program Files (x86)/Steam"), Path("D:/SteamLibrary")])
+
+    def test_autodetect_game_finds_install_in_library(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "SteamLibrary"
+            game = root / "steamapps" / "common" / "Skyrim Special Edition"
+            touch(game / "SkyrimSE.exe")
+            self.assertEqual(check_env.autodetect_game([root]), game)
+
+    def test_autodetect_returns_none_when_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(check_env.autodetect_game([Path(tmp)]))
+
+
 class CheckEnvTests(unittest.TestCase):
     def test_reports_installed_game(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
