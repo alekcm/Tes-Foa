@@ -181,6 +181,51 @@ def read_exe_version(exe: Path) -> str:
     return version or "unknown"
 
 
+def diagnose_flags(game_dir: Path | None) -> int:
+    """Показывает, где вообще может лежать TESV_Papyrus_Flags.flags."""
+    if game_dir is None or not game_dir.is_dir():
+        print("Не знаю папку игры: заполни SKYRIM_DIR в .env.")
+        return 2
+
+    print(f"Ищу *.flags в {game_dir} ...")
+    found = []
+    for path in game_dir.rglob("*.flags"):
+        found.append(path)
+        if len(found) >= 20:
+            break
+    if found:
+        for path in found:
+            print(f"  найден: {path}")
+    else:
+        print("  на диске не найдено ни одного *.flags")
+
+    data_dir = game_dir / "Data"
+    for archive_name in ("Scripts.zip", "Scripts.bsa"):
+        archive = data_dir / archive_name
+        if not archive.is_file():
+            continue
+        print(f"Смотрю содержимое {archive} ...")
+        if archive.suffix.lower() == ".zip":
+            try:
+                with zipfile.ZipFile(archive) as zipped:
+                    entries = [name for name in zipped.namelist() if "flag" in name.lower()]
+                    for name in entries[:20]:
+                        print(f"  в архиве: {name}")
+                    if not entries:
+                        print("  записей со словом flag нет")
+            except (zipfile.BadZipFile, OSError) as error:
+                print(f"  не удалось прочитать архив: {error}")
+        else:
+            print("  BSA-архив: ищи flags через xEdit/BSArch, этот скрипт его не читает")
+
+    print()
+    print("Что делать:")
+    print("1. Если файл найден — впиши его путь в .env как PAPYRUS_FLAGS=...")
+    print("2. Если файла нет нигде — запусти Creation Kit один раз и закрой: он доустанавливает файлы компилятора.")
+    print("3. Если и после этого нет — пришли этот вывод, подберём другой способ.")
+    return 0
+
+
 def build_report(env: dict[str, str]) -> list[dict[str, str]]:
     game_dir = as_path(env.get("SKYRIM_DIR", ""))
     ck_dir = as_path(env.get("CK_DIR", ""))
@@ -290,7 +335,10 @@ def build_report(env: dict[str, str]) -> list[dict[str, str]]:
         if candidate and candidate.is_dir() and any(candidate.glob("*.psc")):
             found_source = candidate
             break
-    add("papyrus_sources", "Исходные скрипты игры", found_source, "нет Scripts.zip и нет *.psc в Data/Scripts")
+    if found_source:
+        add("papyrus_sources", "Исходные скрипты игры", found_source)
+    else:
+        add("papyrus_sources", "Исходные скрипты игры", None, "нет Scripts.zip и нет *.psc в Data/Scripts")
 
     skse_loader = find_in_dirs(("skse64_loader.exe",), (skse_dir, game_dir), max_depth=2)
     add("skse", "skse64_loader.exe", skse_loader)
@@ -314,6 +362,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Проверить локальное окружение сборки Skyrim-мода.")
     parser.add_argument("--tier", choices=sorted(TIER_REQUIRES), help="уровень сборки, для которого важен код возврата")
     parser.add_argument("--json", action="store_true", help="вывести отчёт в JSON")
+    parser.add_argument("--diagnose-flags", action="store_true", help="искать TESV_Papyrus_Flags.flags по папке игры")
     args = parser.parse_args()
 
     try:
@@ -321,7 +370,14 @@ def main() -> int:
     except (AttributeError, ValueError):
         pass
 
-    rows = build_report(load_env())
+    env = load_env()
+    if args.diagnose_flags:
+        game_dir = as_path(env.get("SKYRIM_DIR", ""))
+        if game_dir is None or not (game_dir / "SkyrimSE.exe").is_file():
+            game_dir = autodetect_game()
+        return diagnose_flags(game_dir)
+
+    rows = build_report(env)
 
     if args.json:
         print(json.dumps({"tier": args.tier, "checks": rows}, ensure_ascii=False, indent=2))

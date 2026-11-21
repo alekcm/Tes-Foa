@@ -21,6 +21,7 @@
 - План тестов — `TESTING.md`; инструкция по первым записям в CK — `docs/ck_setup_guide.md`. Оба документа написаны, но ни один шаг не выполнялся.
 - Используемые Papyrus-функции сверены с документацией (`docs/papyrus_verification.md`); `DoCombatSpellCast` не используется, так как для Skyrim не подтверждён.
 - `tools/inspect_plugin.py` читает мастер-файлы и ESL-флаг плагина (проверен на синтетических заголовках); сборка предупреждает о не-ванильных мастер-файлах.
+- Runtime игры по `check_env.py`: `1.7.104.0`, Steam, все три DLC на месте (3/3). `TESV_Papyrus_Flags.flags` пока не найден — добавлен диагностический режим `--diagnose-flags`.
 - `tools/check_env.py` сам ищет игру в библиотеках Steam (реестр + `libraryfolders.vdf`), если `SKYRIM_DIR` не задан.
 - Пошаговая инструкция первого запуска — `docs/first_time.md`; включение плагина без менеджера модов — `tools/enable_plugin.py` (пишет резервную копию plugins.txt).
 - Для обратной связи добавлен `tools/collect_logs.py`: вытаскивает из Papyrus-лога строки `[TGCP]` и ошибки в `logs/papyrus_report.txt`; папка `logs/` в `.gitignore`.

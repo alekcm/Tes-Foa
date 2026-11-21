@@ -9,8 +9,8 @@
 - Runtime/game version: `1.7.104.0` (получено `tools/check_env.py` из свойств `SkyrimSE.exe`, 2026-11-21)
 - Где прочитана версия: свойства файла `SkyrimSE.exe` через PowerShell в `tools/check_env.py`
 - Язык игры: `UNKNOWN`
-- DLC: Dawnguard, HearthFires, Dragonborn. Файл Hearthfire в игре называется `HearthFires.esm`; первая проверка
-  не находила его из-за написания — инструмент исправлен, ожидается 3/3
+- DLC: Dawnguard, HearthFires, Dragonborn — проверка `tools/check_env.py` показала 3/3 (файлы входят в Skyrim SE).
+  Anniversary/CC-контент не покупался и для мода не требуется
 - Creation Club/AE content: `UNKNOWN` — не подтверждено, какие именно CC-пакеты установлены
 - Можно ли откатить/заморозить автообновление для тестового профиля: `UNKNOWN`
 
