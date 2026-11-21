@@ -80,18 +80,29 @@ def compile_scripts(compiler: Path, flags: Path, sources: Path | None, out_dir: 
     include = [SRC]
     if sources:
         include.append(sources)
+    # Компилятор ищет и flags, и скрипты по import-путям, поэтому папку с flags тоже добавляем.
+    if flags.parent not in include:
+        include.append(flags.parent)
+    import_dirs = ";".join(str(path) for path in include)
 
     compiled: list[str] = []
     for script in scripts:
-        command = [str(compiler), str(script), f"-f={flags}"]
-        for path in include:
-            command.append(f"-i={path}")
-        command.append(f"-o={out_dir}")
-        result = subprocess.run(command, capture_output=True, text=True)
+        # Компилятор ищет объект по имени относительно текущей папки / import-путей.
+        # Абсолютный путь он не понимает: "unable to locate script".
+        command = [
+            str(compiler),
+            script.name,
+            f"-f={flags.name}",
+            f"-i={import_dirs}",
+            f"-o={out_dir}",
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, cwd=SRC)
         output = (result.stdout or "") + (result.stderr or "")
         if result.returncode != 0 or not (out_dir / f"{script.stem}.pex").exists():
             print(f"[ошибка] {script.name} не скомпилирован (код {result.returncode})")
             print(output.strip() or "компилятор ничего не вывел")
+            print("Команда для ручной проверки:")
+            print("  " + " ".join(f'"{part}"' if " " in part else part for part in command))
             raise SystemExit(1)
         compiled.append(f"{script.stem}.pex")
         for line in output.strip().splitlines():
