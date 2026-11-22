@@ -323,7 +323,8 @@ python tools\enable_plugin.py --status TGCombatPort.esp
 2. Vortex → вкладка **Mods** → кнопка **Install From File** → выбери этот zip.
 3. Найди мод в списке → **Enable** (включить).
 4. Нажми **Deploy Mods** — Vortex разложит файлы в `Data`.
-5. Вкладка **Plugins** → найди `TGCombatPort.esp` → включи переключатель слева от названия.
+5. Вкладка **Plugins** (в узкой полосе слева, вместе с Mods) → найди `TGCombatPort.esp` → включи его.
+   Это отдельный шаг, про который легко забыть: включение на вкладке **Mods** не включает сам плагин.
 6. Запусти игру из Vortex (кнопка с иконкой игры сверху).
 
 Проверить, что всё встало: `python tools\inspect_records.py build\TGCombatPort.esp --game-dir "A:\...\Skyrim Special Edition"`.
@@ -443,6 +444,7 @@ python tools\collect_logs.py
 | В окне Data видно мои `.esp`/`.esm` | это другие установленные моды | для первого теста не отмечать, см. «Галочка и активный файл» в 5.2 |
 | В окне Data нет моих скриптов | скрипты не плагины | так и должно быть: они грузятся из `Data\Scripts` |
 | Игра не видит плагин | не включён в plugins.txt | шаг 10, `--status` |
+| В `plugins.txt` строка `TGCombatPort.esp` без звёздочки | так помечается выключенный плагин: в Skyrim SE включённые начинаются с `*` | включить во вкладке **Plugins** (Vortex) или `python tools\enable_plugin.py --enable TGCombatPort.esp`. Проверка: `inspect_records.py ... --game-dir` |
 | В логе нет `[TGCP]` | логи выключены / квест не стартовал | шаги 11 и 8.1 |
 | CK падает при сохранении | плагин в нестандартном пути или нет прав | сохранить в `Data`, запустить CK от имени администратора |
 
