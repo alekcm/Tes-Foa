@@ -25,6 +25,18 @@
 IsEquippedRightType(1) OR IsEquippedRightType(2)
 ```
 
+## Контрольные суммы (чтобы сверить свою копию с той, что в релизе)
+
+SHA-256 считаются командой `certutil -hashfile "<путь к файлу>" SHA256` в cmd:
+
+| Файл | Размер | SHA-256 |
+|---|---|---|
+| `animations\DynamicAnimationReplacer\_CustomConditions\90001\1hm_attackpowerfwd.hkx` (3-е лицо) | 17 904 | `c33488ebb15113ba0178ff5bb46f8b4d84d1c58f04e72fc4314c00f0336daa2b` |
+| `_1stperson\animations\DynamicAnimationReplacer\_CustomConditions\90001\1hm_attackpowerfwd.hkx` (1-е лицо) | 9 200 | `8b2f33dd9c28e7b83500167289ddfae1baa888b3ff3e01554af78a026c3812b1` |
+
+Если хэш не совпал — файл другой (чаще всего это архив, скачанный не из последнего релиза, или
+файл, который перезаписал другой анимационный мод).
+
 ## Что нужно установить
 
 Анимацию назначает мод **Dynamic Animation Replacer** (сокращённо DAR) — бесплатный SKSE-плагин

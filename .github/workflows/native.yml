@@ -118,14 +118,15 @@ jobs:
           $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $name))
           try {
             $entries = @($archive.Entries | ForEach-Object { $_.FullName -replace '\\', '/' })
-            foreach ($entry in $archive.Entries) {
-              Write-Output ("::notice::в архиве: " + ($entry.FullName -replace '\\', '/') + " (" + $entry.Length + " байт)")
-            }
+            Write-Output ("::notice::файлов в архиве: " + $entries.Count)
+            # Печатаем только четыре нужных файла: GitHub обрезает заметки после десяти.
             foreach ($file in $animFiles) {
               $wanted = 'meshes/' + $file
               if ($entries -notcontains $wanted) {
                 throw "в архиве нет $wanted — анимация укола не попала в версию"
               }
+              $size = ($archive.Entries | Where-Object { ($_.FullName -replace '\\', '/') -eq $wanted }).Length
+              Write-Output ("::notice::анимация в архиве: " + $wanted + " (" + $size + " байт)")
             }
             Write-Output "проверка архива: анимация укола на месте (4 файла)"
           } finally {
