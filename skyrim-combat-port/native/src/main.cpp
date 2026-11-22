@@ -43,6 +43,7 @@ namespace
 	constexpr float kStaggerMagnitude = 1.0f;     // сила стаггера 0..1 (CK Wiki Magic Effect)
 	constexpr float kStaggerCooldown = 4.0f;      // пауза между стаггерами (дизайн: ~1 с стаггер + запас)
 	constexpr float kStaggerDelaySeconds = 0.25f; // стаггер применяем на удар, а не на замах
+	constexpr float kDisorientSeconds = 1.2f;     // сколько держим «дезориентацию» после пробития блока
 
 	std::atomic_bool g_enabled{ true };
 	std::atomic<std::uint64_t> g_ticks{ 0 };
@@ -59,6 +60,7 @@ namespace
 	void OnBashFinished(RE::Actor* a_actor);
 	void OnPlayerHit(RE::Actor* a_attacker, const RE::TESHitEvent* a_event);
 	void OrderBash(RE::Actor* a_actor, float a_distance, Clock::time_point a_now);
+	void ApplyStagger(RE::Actor* a_source, const char* a_why);
 
 	// Слушает animation events актёра, которому заказали баш: единственное, что граф реально
 	// рассылает, — bashStop (лог 0.6.2). Служит запасным триггером для НАШЕГО заказа,
@@ -152,6 +154,11 @@ namespace
 	};
 
 	std::vector<BlockProbe> g_blockProbes;
+
+	// Окно дезориентации: пока оно идёт, блок игрока гасим повторно, чтобы его нельзя было
+	// удержать. Лог 0.7.2 показал, что blockStop в стаггере граф игнорирует (sent=false).
+	Clock::time_point g_disorientUntil{};
+	int               g_disorientKicks{ 0 };
 
 	bool HasShield(RE::Actor* a_actor)
 	{
@@ -284,11 +291,13 @@ namespace
 			const auto    effectCount = static_cast<int>(spell->effects.size());
 			std::uint32_t duration = 0;
 			float         magnitude = 0.0f;
+			std::uint32_t area = 0;
 			bool          foundStagger = false;
 			for (auto* effect : spell->effects) {
 				if (effect && effect->baseEffect && effect->baseEffect->HasArchetype(RE::EffectArchetype::kStagger)) {
 					duration = effect->effectItem.duration;
 					magnitude = effect->effectItem.magnitude;
+					area = effect->effectItem.area;
 					foundStagger = true;
 					break;
 				}
@@ -296,13 +305,14 @@ namespace
 
 			if (shown < 12) {
 				++shown;
-				logs::info("  stagger spell: {} ({:08X}) type={} cast={} delivery={} effects={} dur={} mag={:.2f} cost={}",
+				logs::info("  stagger spell: {} ({:08X}) type={} cast={} delivery={} effects={} area={} dur={} mag={:.2f} cost={}",
 					spell->GetName(),
 					spell->GetFormID(),
 					static_cast<int>(spell->GetSpellType()),
 					static_cast<int>(spell->GetCastingType()),
 					static_cast<int>(spell->GetDelivery()),
 					effectCount,
+					area,
 					duration,
 					magnitude,
 					spell->data.costOverride);
@@ -312,6 +322,11 @@ namespace
 				continue;
 			}
 			if (spell->GetCastingType() != RE::MagicSystem::CastingType::kFireAndForget) {
+				continue;
+			}
+			// Жёсткие фильтры: ровно один эффект и нулевая площадь. Иначе спелл бьёт игрока
+			// уроном и рисует эффекты (лог 0.7.2: «Топот великана» — разлом на земле).
+			if (effectCount != 1 || area != 0) {
 				continue;
 			}
 
@@ -369,9 +384,35 @@ namespace
 		logs::info("block kick: {} → blockStop sent={}", a_why, sent);
 	}
 
+	// Основной способ: переводим игрока в собственное состояние стаггера графа (staggerStart).
+	// Это то состояние, которым движок сам прерывает действия (UESP: «Staggering interrupts
+	// whatever action was being taken by the target»), и в отличие от спелла оно не даёт
+	// ни урона, ни эффектов на земле (лог 0.7.2: «Топот великана» бил игрока и рисовал разлом).
+	// Допущение AS-14.
+	bool StaggerByGraph(RE::PlayerCharacter* a_player, const std::string& a_why)
+	{
+		if (!a_player) {
+			return false;
+		}
+		const bool sent = a_player->NotifyAnimationGraph(RE::BSFixedString("staggerStart"));
+		logs::info("stagger anim: staggerStart sent={} ({})", sent, a_why);
+		return sent;
+	}
+
 	// Накладываем стаггер на игрока от имени NPC: caster — сам NPC, target — игрок.
 	// AS-1 опровергнуто логом 0.7.1: стаггер НЕ снимает блок у игрока, поэтому блок гасим отдельно
 	// (AS-10, KickBlock). Подтверждены: AS-2 (стаггер виден), AS-4 (каст без анимации).
+	// Эффект stagger: сначала состояние графа (без урона и визуальных эффектов),
+	// и только если граф отказал — спелл-стаггер.
+	void Stagger(RE::Actor* a_source, const std::string& a_why)
+	{
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		if (StaggerByGraph(player, a_why)) {
+			return;
+		}
+		ApplyStagger(a_source, a_why.c_str());
+	}
+
 	void ApplyStagger(RE::Actor* a_source, const char* a_why)
 	{
 		auto* player = RE::PlayerCharacter::GetSingleton();
@@ -1161,7 +1202,7 @@ namespace
 		auto* player = RE::PlayerCharacter::GetSingleton();
 		switch (a_effect) {
 		case EffectId::kStagger:
-			ApplyStagger(a_source, a_why.c_str());
+			Stagger(a_source, a_why);
 			break;
 		case EffectId::kUnblock:
 			KickBlock(player, a_why.c_str());
@@ -1171,6 +1212,11 @@ namespace
 				OrderBash(a_source, a_source->GetPosition().GetDistance(player->GetPosition()), Clock::now());
 			}
 			break;
+		}
+		if (a_effect == EffectId::kUnblock || a_effect == EffectId::kStagger) {
+			g_disorientUntil = Clock::now() +
+				std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kDisorientSeconds));
+			g_disorientKicks = 0;
 		}
 		ScheduleProbes(a_why, a_effect == EffectId::kUnblock);
 	}
@@ -1216,6 +1262,24 @@ namespace
 				continue;
 			}
 			FireRule(rule, source, "заказ");
+		}
+	}
+
+	// Пока идёт окно дезориентации, блок игрока гасим повторно: удержать его он не должен.
+	// Лог 0.7.2: во время стаггера граф отвечает на blockStop sent=false, поэтому пробуем снова.
+	void ProcessDisorient(Clock::time_point a_now)
+	{
+		if (a_now > g_disorientUntil) {
+			g_disorientKicks = 0;
+			return;
+		}
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		if (!player || !player->IsBlocking()) {
+			return;
+		}
+		if (g_disorientKicks < 6) {
+			++g_disorientKicks;
+			KickBlock(player, "дезориентация: блок не удержать");
 		}
 	}
 
@@ -1540,6 +1604,7 @@ namespace
 		CloseExpiredWatches(now);
 		ProcessBlockProbes(now);
 		ProcessPendingFires(now);
+		ProcessDisorient(now);
 
 		if (!g_staggerSearched) {
 			InitStaggerSpell();
