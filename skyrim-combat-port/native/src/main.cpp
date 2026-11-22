@@ -74,14 +74,14 @@ namespace
 
 	// Булава или двуручный молот (в движке это типы kOneHandMace и kTwoHandAxe;
 	// к kTwoHandAxe относится и двуручный топор — их движок не различает по типу).
-	RE::TESObjectWEAP* GetHeavyBlunt(RE::Actor* a_actor)
+	const RE::TESObjectWEAP* GetHeavyBlunt(RE::Actor* a_actor)
 	{
 		for (const bool leftHand : { false, true }) {
 			const auto* equipped = a_actor->GetEquippedObject(leftHand);
 			if (!equipped) {
 				continue;
 			}
-			auto* weapon = equipped->As<RE::TESObjectWEAP>();
+			const auto* weapon = equipped->As<RE::TESObjectWEAP>();
 			if (!weapon) {
 				continue;
 			}
@@ -148,7 +148,7 @@ namespace
 	}
 
 	// Правило 2: щит пробивается силовой атакой булавы/двуручного молота.
-	void OpenPowerWindow(RE::Actor* a_actor, RE::TESObjectWEAP* a_weapon, float a_distance, Clock::time_point a_now)
+	void OpenPowerWindow(RE::Actor* a_actor, const RE::TESObjectWEAP* a_weapon, float a_distance, Clock::time_point a_now)
 	{
 		const auto actorID = a_actor->GetFormID();
 		if (!CooldownPassed(g_lastPower, actorID, a_now)) {
@@ -202,7 +202,7 @@ namespace
 		}
 
 		if (a_playerBlocksWithShield) {
-			if (auto* weapon = GetHeavyBlunt(a_actor)) {
+			if (const auto* weapon = GetHeavyBlunt(a_actor)) {
 				OpenPowerWindow(a_actor, weapon, distance, a_now);
 			}
 			return;
