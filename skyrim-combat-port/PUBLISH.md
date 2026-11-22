@@ -20,14 +20,14 @@ cd /d "%USERPROFILE%\Downloads\skyrim-combat-port"
 # На macOS/Linux укажи свой путь, например:
 # cd "$HOME/Downloads/skyrim-combat-port"
 
-git init -b main
+git init -b master
 git add README.md AGENT_TASK.md SETUP.md DEPENDENCIES.md STATUS.md PUBLISH.md .gitignore .gitattributes docs data
 git status --short
 # Проверь, что в выводе есть оба файла data/:
 # data/combat_tables_phases_1-2.xlsx и data/phases_1-2_coverage.json
 git commit -m "Add combat design and implementation handoff"
 git remote add origin https://github.com/ТВОЙ-АККАУНТ/ИМЯ-РЕПО.git
-git push -u origin main
+git push -u origin master
 ```
 
 Замени последний URL на скопированный URL своего репозитория. Если Git просит указать автора коммита, задай своё имя/email локально:
