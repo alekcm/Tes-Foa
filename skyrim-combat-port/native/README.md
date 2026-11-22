@@ -15,10 +15,28 @@
 ### Механика бандита со щитом
 
 «Bash только против блока»: пока игрок держит блок, плагин ищет бандитов со щитом, которые враждебны
-игроку и стоят в ближнем бою (≤ 240), и на **1,5 с** поднимает в их `CombatStyle` множитель
-`meleeData.bashMult` (`0.5 → 10.0`). Это те самые числа, по которым AI выбирает атаку, поэтому бандит
-бьёт щитом сам; анимация, урон, блок и попадание остаются ванильными. Через 1,5 с исходное значение
-возвращается, повторно для того же бандита — не раньше **7 с**.
+игроку и стоят в ближнем бою (≤ 240), и на **2,5 с** поднимает в их `CombatStyle` множители выбора
+атаки — `bashMult`, `bashRecoilMult`, `bashAttackMult`, `bashPowerAttackMult`, `powerAttackBlockingMult`
+(до 10.0). Это те самые числа, по которым AI выбирает атаку, поэтому бандит решает сам; анимация, урон,
+блок и попадание остаются ванильными. Через 2,5 с исходные значения возвращаются, повторно для того же
+бандита — не раньше **7 с**.
+
+Почему не только `bashMult` (проверено в игре 22.11.2026 — бандит не ударил щитом ни разу): у каждого
+множителя своё условие, это видно по описаниям полей `CombatStyle` (CK Wiki, раздел CombatStyle script,
+и разбор в Grimy Combat Patcher):
+
+| Поле | Когда применяется |
+|---|---|
+| `bashMult` | просто ударить щитом, без повода |
+| `bashRecoilMult` | ударить щитом после успешного блока |
+| `bashAttackMult` | ударить щитом по атакующему |
+| `bashPowerAttackMult` | ударить щитом по силовой атаке |
+| `powerAttackBlockingMult` | силовая атака по блокирующему |
+
+Для игрока, который **только держит блок**, в движке предусмотрена именно силовая атака
+(`powerAttackBlockingMult`), а «bash по блокирующему» отдельного множителя не имеет — поэтому поднимаем
+все пять сразу. Проверить, что именно сделал бандит, можно по строке `bandit anim: <событие>` в логе:
+`sink` подписывается на animation events бандита, пока окно открыто.
 
 Честно о побочном эффекте: `CombatStyle` — общая запись, поэтому подъём на 1,5 с действует и на других
 NPC с тем же стилем. Окно короткое и открывается только пока игрок блокирует.
@@ -42,10 +60,10 @@ xmake build
 
 Собранный плагин публикуется как GitHub Release по тегу `v*`:
 
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.2.0/TGCombatPort-v0.2.0.zip —
+- https://github.com/alekcm/Tes-Foa/releases/download/v0.2.1/TGCombatPort-v0.2.1.zip —
   архив с `SKSE/Plugins/TGCombatPort.dll`, распаковывается в папку `Data` игры
   или ставится как обычный мод в Vortex;
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.2.0/TGCombatPort.dll — сам файл.
+- https://github.com/alekcm/Tes-Foa/releases/download/v0.2.1/TGCombatPort.dll — сам файл.
 
 Почему не через `git pull`: в git лежат исходники; `.dll` — собранный Windows-бинарник, он
 собирается на сервере GitHub и выкладывается в Releases. Папка проекта на рабочем столе и
@@ -53,11 +71,11 @@ xmake build
 
 ## Установка (для проверки)
 
-1. Скачать `TGCombatPort-v0.2.0.zip` по ссылке выше (внутри DLL **и** обновлённые `.pex`).
+1. Скачать `TGCombatPort-v0.2.1.zip` по ссылке выше (внутри DLL **и** обновлённые `.pex`).
 2. Распаковать в папку `Data` игры (cmd):
 
 ```cmd
-tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.2.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
+tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.2.1.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
 ```
 
 3. Поставить **Address Library v13** (Nexus, мод 32444, файл для 1.6+) — без него DLL не загрузится.
