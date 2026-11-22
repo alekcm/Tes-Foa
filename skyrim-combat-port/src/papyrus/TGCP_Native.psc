@@ -9,6 +9,9 @@ ScriptName TGCP_Native Hidden
 ; true, если актёр прямо сейчас блокирует (состояние движка, не событие анимации).
 Bool Function IsBlocking(Actor akActor) Global Native
 
+; true, если актёр блокирует именно щитом (а не оружием/кулаками).
+Bool Function IsBlockingWithShield(Actor akActor) Global Native
+
 ; Один шаг механики бандита: закрыть истёкшие окна, открыть новое окно,
 ; если игрок блокирует и рядом есть щитоносец. Зовётся из TGCP_PlayerBlockWatcher
 ; каждые 0.25 с, пока игрок держит блок.
