@@ -18,7 +18,7 @@ hit-flags       = blocked
 hit-not-flags   = power
 attack.kind     = melee, ranged, spell, shout, unarmed | any
 attacker.race   = BearRace, Skyrim.esm|0x131E9, 0x000131E9
-attacker.weapon = fists, sword, dagger, axe, mace, greatsword, battleaxe, bow, staff, crossbow | any
+attacker.weapon = fists, sword, dagger, axe, mace, greatsword, battleaxe, warhammer, bow, staff, crossbow | any
 attacker.shield = yes | no | any
 hit.source      = <форма чем бьют: оружие / заклинание / крик>
 hit.projectile  = <форма снаряда: болт / стрела / файрбол>
@@ -81,8 +81,9 @@ player.shield = yes
 do = unblock, stagger
 ```
 
-Обрати внимание: `battleaxe` здесь больше нет — это весь двуручный тип движка (`kTwoHandAxe`),
-то есть и топор, и молот; по решению 22.11.2026 обычное двуручное щит не пробивает.
+Обрати внимание: двуручный топор и двуручный молот у движка один тип (`kTwoHandAxe`), поэтому
+в правилах они различаются кейвордами — `battleaxe` = `WeapTypeBattleaxe`, `warhammer` =
+`WeapTypeWarhammer` (с 0.14.0). Обычное двуручное (топор) щит не пробивает, молот — пробивает.
 
 ## Примеры правок
 

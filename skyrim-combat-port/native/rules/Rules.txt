@@ -11,11 +11,11 @@
 #   hit-not-flags   = power          (ни одного из перечисленных быть не должно)
 #   attack.kind     = melee, ranged, spell, shout, unarmed, any
 #   attacker.race     = <раса>        например BearRace; список через запятую
-#   attacker.weapon   = fists, sword, dagger, axe, mace, greatsword, battleaxe, bow, staff,
-#                       crossbow | any
-#                       Внимание: «battleaxe» — это весь двуручный тип движка (kTwoHandAxe),
-#                       то есть И топор, И молот. Отдельного «warhammer» пока нет: чтобы
-#                       различать их, нужен признак по кейворду WeapTypeWarhammer (задача в коде).
+#   attacker.weapon   = fists, sword, dagger, axe, mace, greatsword, battleaxe, warhammer,
+#                       bow, staff, crossbow | any
+#                       Двуручный топор и двуручный молот у движка ОДИН тип (kTwoHandAxe),
+#                       поэтому они различаются кейвордами: battleaxe = WeapTypeBattleaxe,
+#                       warhammer = WeapTypeWarhammer (так же их различают ванильные перки).
 #   attacker.shield   = yes | no | any
 #   hit.source      = <форма>        то, чем бьют: оружие, заклинание, крик (TESHitEvent::source)
 #   hit.projectile  = <форма>        снаряд: болт, стрела, файрбол (TESHitEvent::projectile)
@@ -64,11 +64,21 @@ do = stagger
 cooldown = 3
 
 [onehand-mace-power-breaks-shield-block]
-# Щит игрока пробивает силовая атака булавы. Двуручное сюда не входит:
-# обычное двуручное у противников не пробивает (решение 22.11.2026).
+# Щит игрока пробивает силовая атака булавы.
 trigger = hit
 hit-flags = blocked, power
 attacker.weapon = mace
+player.blocking = yes
+player.shield = yes
+do = unblock, stagger
+cooldown = 4
+
+[twohand-warhammer-breaks-shield-block]
+# Двуручный МОЛОТ пробивает щит. Двуручный топор — нет: у него своё правило ниже,
+# а различаются они кейвордом WeapTypeWarhammer.
+trigger = hit
+hit-flags = blocked, power
+attacker.weapon = warhammer
 player.blocking = yes
 player.shield = yes
 do = unblock, stagger
@@ -153,20 +163,7 @@ cooldown = 0
 #    chip = 8
 #    cooldown = 0
 #
-# 2) «Двуручный молот пробивает щит, двуручный топор — нет».
-#    Сейчас оба приходят как battleaxe (kTwoHandAxe), различить нечем.
-#    Нужен признак по кейворду WeapTypeWarhammer в коде, затем включается:
-#
-#    [twohand-warhammer-breaks-shield-block]
-#    trigger = hit
-#    hit-flags = blocked, power
-#    attacker.weapon = warhammer
-#    player.blocking = yes
-#    player.shield = yes
-#    do = unblock, stagger
-#    cooldown = 4
-#
-# 3) «Двуручный топор наносит травму, но не оглушает».
+# 2) «Двуручный топор наносит травму, но не оглушает».
 #    Нужен эффект wound (ранения по частям тела), его пока нет:
 #
 #    [twohand-axe-wounds]

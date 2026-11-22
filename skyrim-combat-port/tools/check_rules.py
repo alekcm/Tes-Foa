@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT = ROOT / "native" / "rules" / "Rules.txt"
 
 # Из native/src/main.cpp: kWeaponTable.
-WEAPONS = {"fists", "sword", "dagger", "axe", "mace", "greatsword", "battleaxe", "bow", "staff", "crossbow"}
+WEAPONS = {"fists", "sword", "dagger", "axe", "mace", "greatsword", "battleaxe", "warhammer", "bow", "staff", "crossbow"}
 KINDS = {"melee", "ranged", "spell", "shout", "unarmed", "any"}
 TRIGGERS = {"hit", "bash"}
 TRI = {"yes", "no", "any"}

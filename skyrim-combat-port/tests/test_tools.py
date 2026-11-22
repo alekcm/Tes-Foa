@@ -852,8 +852,8 @@ class RulesFileTests(unittest.TestCase):
         self.assertIn("spell-through-weapon-block", names)
 
     def test_unknown_weapon_is_reported(self) -> None:
-        problems, _ = check_rules.check_text("[x]\nattacker.weapon = warhammer\n")
-        self.assertTrue(any("warhammer" in problem for problem in problems))
+        problems, _ = check_rules.check_text("[x]\nattacker.weapon = halberd\n")
+        self.assertTrue(any("halberd" in problem for problem in problems))
 
     def test_unknown_key_is_reported(self) -> None:
         problems, _ = check_rules.check_text("[x]\nplayer.blokcing = yes\n")
@@ -862,3 +862,18 @@ class RulesFileTests(unittest.TestCase):
     def test_bad_tri_state_is_reported(self) -> None:
         problems, _ = check_rules.check_text("[x]\nplayer.shield = maybe\n")
         self.assertTrue(any("yes/no/any" in problem for problem in problems))
+
+class WeaponTableTests(unittest.TestCase):
+    """Список оружия в main.cpp и в валидаторе правил должен совпадать, иначе опечатка пройдёт."""
+
+    def test_python_validator_matches_cpp_table(self) -> None:
+        source = (ROOT / "native" / "src" / "main.cpp").read_text(encoding="utf-8")
+        # Записи таблицы вида { "mace", RE::WEAPON_TYPE::kOneHandMace, nullptr },
+        ids = set(re.findall(r'\{\s*"([a-z]+)",\s*RE::WEAPON_TYPE::k\w+', source))
+        ids.discard("any")
+        self.assertEqual(ids, check_rules.WEAPONS)
+
+    def test_warhammer_uses_keyword(self) -> None:
+        source = (ROOT / "native" / "src" / "main.cpp").read_text(encoding="utf-8")
+        self.assertIn('"warhammer", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeWarhammer"', source)
+        self.assertIn('"battleaxe", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeBattleaxe"', source)

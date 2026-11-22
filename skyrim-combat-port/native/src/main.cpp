@@ -505,23 +505,30 @@ namespace
 		{ "chip", EffectId::kChip },        // урон сквозь блок (AS-16): блок остаётся, оглушения нет
 	};
 
+	// Оружие из файла правил. Тип движка у двуручного топора и двуручного молота ОДИН
+	// (kTwoHandAxe = 6, RE/T/TESObjectWEAP.h), поэтому они различаются кейвордом, как и в
+	// ванильных перках: WeapTypeBattleaxe против WeapTypeWarhammer.
+	// Проверено по заголовкам: TESObjectWEAP наследует BGSKeywordForm
+	// (RE/T/TESObjectWEAP.h:74), у него есть HasKeywordID (RE/B/BGSKeywordForm.h:36).
 	struct WeaponDef
 	{
 		const char*     id;
 		RE::WEAPON_TYPE type;
+		const char*     keyword;
 	};
 
 	constexpr WeaponDef kWeaponTable[] = {
-		{ "fists", RE::WEAPON_TYPE::kHandToHandMelee },
-		{ "sword", RE::WEAPON_TYPE::kOneHandSword },
-		{ "dagger", RE::WEAPON_TYPE::kOneHandDagger },
-		{ "axe", RE::WEAPON_TYPE::kOneHandAxe },
-		{ "mace", RE::WEAPON_TYPE::kOneHandMace },
-		{ "greatsword", RE::WEAPON_TYPE::kTwoHandSword },
-		{ "battleaxe", RE::WEAPON_TYPE::kTwoHandAxe },
-		{ "bow", RE::WEAPON_TYPE::kBow },
-		{ "staff", RE::WEAPON_TYPE::kStaff },
-		{ "crossbow", RE::WEAPON_TYPE::kCrossbow },
+		{ "fists", RE::WEAPON_TYPE::kHandToHandMelee, nullptr },
+		{ "sword", RE::WEAPON_TYPE::kOneHandSword, nullptr },
+		{ "dagger", RE::WEAPON_TYPE::kOneHandDagger, nullptr },
+		{ "axe", RE::WEAPON_TYPE::kOneHandAxe, nullptr },
+		{ "mace", RE::WEAPON_TYPE::kOneHandMace, nullptr },
+		{ "greatsword", RE::WEAPON_TYPE::kTwoHandSword, nullptr },
+		{ "battleaxe", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeBattleaxe" },
+		{ "warhammer", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeWarhammer" },
+		{ "bow", RE::WEAPON_TYPE::kBow, nullptr },
+		{ "staff", RE::WEAPON_TYPE::kStaff, nullptr },
+		{ "crossbow", RE::WEAPON_TYPE::kCrossbow, nullptr },
 	};
 
 	// Ссылка на форму из файла правил: пишется человеком (EditorID или плагин|0xID),
@@ -545,6 +552,14 @@ namespace
 		AttackKind   kind{ AttackKind::kUnarmed };
 	};
 
+	// Совпадение оружия: тип движка и, если нужно, обязательный кейворд (battleaxe/warhammer).
+	struct WeaponMatch
+	{
+		RE::WEAPON_TYPE type{ RE::WEAPON_TYPE::kHandToHandMelee };
+		RE::FormID      keyword{ 0 };       // 0 — кейворд не нужен
+		std::string     keywordText;
+	};
+
 	struct Rule
 	{
 		std::string                  name;
@@ -554,7 +569,7 @@ namespace
 		Tri                          attackerShield{ Tri::kAny };
 		Tri                          playerBlocking{ Tri::kYes };
 		Tri                          playerShield{ Tri::kAny };
-		std::vector<RE::WEAPON_TYPE> weapons;
+		std::vector<WeaponMatch>     weapons;
 		std::vector<FormFilter>      races;
 		std::vector<FormFilter>      sources;
 		std::vector<FormFilter>      projectiles;
@@ -643,11 +658,12 @@ namespace
 		return false;
 	}
 
-	bool ParseWeapon(const std::string& a_value, RE::WEAPON_TYPE& a_out)
+	bool ParseWeapon(const std::string& a_value, WeaponMatch& a_out)
 	{
 		for (const auto& entry : kWeaponTable) {
 			if (a_value == entry.id) {
-				a_out = entry.type;
+				a_out.type = entry.type;
+				a_out.keywordText = entry.keyword ? entry.keyword : "";
 				return true;
 			}
 		}
@@ -696,15 +712,16 @@ namespace
 		return text.empty() ? std::string("none") : text;
 	}
 
-	std::string WeaponsText(const std::vector<RE::WEAPON_TYPE>& a_weapons)
+	std::string WeaponsText(const std::vector<WeaponMatch>& a_weapons)
 	{
 		if (a_weapons.empty()) {
 			return "any";
 		}
 		std::string text;
-		for (const auto type : a_weapons) {
+		for (const auto& match : a_weapons) {
 			for (const auto& entry : kWeaponTable) {
-				if (entry.type == type) {
+				const bool sameKeyword = (entry.keyword ? entry.keyword : "") == match.keywordText;
+				if (entry.type == match.type && sameKeyword) {
 					text += (text.empty() ? "" : ",") + std::string(entry.id);
 					break;
 				}
@@ -968,11 +985,17 @@ namespace
 				if (item == "any") {
 					continue;
 				}
-				RE::WEAPON_TYPE type{};
-				if (!ParseWeapon(item, type)) {
+				WeaponMatch match;
+				if (!ParseWeapon(item, match)) {
 					return false;
 				}
-				a_rule.weapons.push_back(type);
+				// Допущение AS-20: кейворды WeapTypeBattleaxe и WeapTypeWarhammer есть в
+				// Skyrim.esm и висят на двуручном оружии (так их используют ванильные перки).
+				// Опечатка в имени кейворда должна выключать правило громко, а не молча.
+				if (!match.keywordText.empty() && !ResolveForm(match.keywordText, match.keyword)) {
+					return false;
+				}
+				a_rule.weapons.push_back(match);
 			}
 			return true;
 		}
@@ -1023,7 +1046,7 @@ namespace
 		power.triggers = kTriggerHit;
 		power.hitRequire = static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked) |
 			static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kPowerAttack);
-		power.weapons = { RE::WEAPON_TYPE::kOneHandMace, RE::WEAPON_TYPE::kTwoHandAxe };
+		power.weapons = { WeaponMatch{ RE::WEAPON_TYPE::kOneHandMace, 0, "" } };
 		power.playerBlocking = Tri::kYes;
 		power.playerShield = Tri::kYes;
 		power.effects = { EffectId::kUnblock, EffectId::kStagger };
@@ -1189,7 +1212,14 @@ namespace
 				return false;
 			}
 			const auto type = weapon->GetWeaponType();
-			if (std::find(a_rule.weapons.begin(), a_rule.weapons.end(), type) == a_rule.weapons.end()) {
+			const bool matched = std::any_of(
+				a_rule.weapons.begin(), a_rule.weapons.end(), [weapon, type](const WeaponMatch& a_match) {
+					// Тип движка у двуручного топора и молота общий, поэтому при заданном
+					// кейворде проверяем именно его (BGSKeywordForm::HasKeywordID).
+					return a_match.type == type &&
+						(a_match.keyword == 0 || weapon->HasKeywordID(a_match.keyword));
+				});
+			if (!matched) {
 				return false;
 			}
 		}
