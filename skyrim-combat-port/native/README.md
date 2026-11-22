@@ -3,7 +3,7 @@
 Здесь лежит C++ часть мода. Она нужна только для того, чего не умеет Papyrus:
 точное чтение состояния анимации и (в перспективе) управление действиями NPC.
 
-## Что уже есть (0.7.0)
+## Что уже есть (0.7.1)
 
 Хуков (патчинга кода игры) нет: версия 0.1.1 патчила `Actor::GetAttackChance` и вызывала вылет, способ убран.
 
@@ -64,6 +64,26 @@ stagger applied: баш щитоносца, игрок блокирует без
 Пошагово, для первого раза: [`docs/console_spawn.md`](../docs/console_spawn.md). Коротко: `ё` —
 консоль, `help draugr 4`, клик по строке, `player.placeatme <ID> 1`, Enter. Для проверки механики
 это не требуется: она срабатывает в любой драке с бандитом, у которого есть щит.
+
+### 0.7.1: 0.7.0 переписана по источникам
+
+0.7.0 была написана до того, как справочник `docs/reference/` появился. При проверке каждой строки
+нашлись три вещи, которые в 0.7.0 были сделаны неправильно, и они исправлены:
+
+| Было в 0.7.0 | Стало в 0.7.1 | Почему |
+|---|---|---|
+| силовая атака ловилась по animation event `attackPowerStart*` | ловится по `RE::TESHitEvent` с флагом `kPowerAttack` + `kHitBlocked` | анимация не говорит ни о попадании, ни о блоке; `TESHitEvent` говорит об обоих (`RE/T/TESHitEvent.h`) |
+| дистанция баша — константа 140 «по совпадению» | читается `fCombatBashReach` из `GameSettingCollection` (141 по CK Wiki), fallback 141 | значение принадлежит движку, а не нам (`AS-9`) |
+| подъём `powerAttackBlockingMult` через правку `CombatStyle` | убрано полностью | лог 0.2.1: множители ни разу не заставили AI ударить башем; правка ванильных форм — риск без пользы |
+| выбор спелла «минимум эффектов» | выбор по оценке: обычный спелл + один эффект + `duration = 0` + `magnitude > 0` | `duration` в архетипе Stagger — это пауза до следующего стаггера (CK Wiki), а не длительность |
+| отложенный стаггер терял NPC-источник | `PendingStagger` хранит `ActorHandle` источника и переверяет блок/дистанцию перед кастом | эффект должен исходить от того, кто ударил |
+
+Триггеры теперь двух видов и оба пишут в лог:
+
+1. **настоящее попадание** (`TESHitEvent`): `stagger cast: баш щитоносца (попадание)` или
+   `stagger cast: силовая по блоку щитом (попадание)`, а если условия не сошлись —
+   `hit без эффекта: actor=… bash=false power=true blocked=true игрок.щит=false …`;
+2. **наш заказанный баш** (попаданий не создаёт): `bash finished:` → `stagger cast: баш щитоносца (заказ)`.
 
 ### 0.7.0: что показал лог 0.6.2 и что теперь делает плагин
 
@@ -171,7 +191,7 @@ xmake build
 
 Собранный плагин публикуется как GitHub Release по тегу `v*`:
 
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.7.0/TGCombatPort-v0.7.0.zip —
+- https://github.com/alekcm/Tes-Foa/releases/download/v0.7.1/TGCombatPort-v0.7.1.zip —
   архив с `SKSE/Plugins/TGCombatPort.dll`, распаковывается в папку `Data` игры
   или ставится как обычный мод в Vortex.
 
@@ -191,15 +211,15 @@ xmake build
   (`dir "%USERPROFILE%\Downloads\TGCombatPort*.dll"`) и скопируйте нужный с переименованием;
 - если мод стоит в **Vortex**, он раскладывает файлы в `Data` сам при развёртывании и может вернуть
   старую версию поверх ручной копии. В этом случае ставить надо архив
-  (`TGCombatPort-v0.7.0.zip`) через Vortex → Install From File, а не копированием.
+  (`TGCombatPort-v0.7.1.zip`) через Vortex → Install From File, а не копированием.
 
 ## Установка (для проверки)
 
-1. Скачать `TGCombatPort-v0.7.0.zip` по ссылке выше.
+1. Скачать `TGCombatPort-v0.7.1.zip` по ссылке выше.
 2. Распаковать в папку `Data` игры (cmd):
 
 ```cmd
-tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.7.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
+tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.7.1.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
 ```
 
 3. Поставить **Address Library v13** (Nexus, мод 32444, файл для 1.6+) — без него DLL не загрузится.
