@@ -180,6 +180,13 @@ namespace
 
 	// Булава или двуручный молот/топор. В движке это типы kOneHandMace и kTwoHandAxe
 	// (двуручный топор отдельного типа не имеет) — docs/reference/commonlib-api.md.
+	// Вард: величина kWardPower > 0 (ActorValues.h: kWardPower = 63, kWardDeflection = 67).
+	// Допущение AS-15.
+	bool HasWard(RE::Actor* a_actor)
+	{
+		return a_actor && a_actor->GetActorValue(RE::ActorValue::kWardPower) > 0.0f;
+	}
+
 	const RE::TESObjectWEAP* GetHeavyBlunt(RE::Actor* a_actor)
 	{
 		if (!a_actor) {
@@ -480,7 +487,7 @@ namespace
 	// и запускать эффекты из kEffectTable. Добавили эффект — одна запись в таблице.
 
 	enum class Tri { kAny, kYes, kNo };
-	enum class EffectId { kStagger, kUnblock, kBash };
+	enum class EffectId { kStagger, kUnblock, kBash, kChip };
 
 	constexpr unsigned kTriggerHit = 1u << 0;   // настоящее попадание (RE::TESHitEvent)
 	constexpr unsigned kTriggerBash = 1u << 1;  // наш заказанный баш закончился (bashStop)
@@ -495,6 +502,7 @@ namespace
 		{ "stagger", EffectId::kStagger },  // стаггер спеллом от имени NPC (ApplyStagger)
 		{ "unblock", EffectId::kUnblock },  // снять блок и удерживать снятым (KickBlock)
 		{ "bash", EffectId::kBash },        // заказать NPC баш (OrderBash)
+		{ "chip", EffectId::kChip },        // урон сквозь блок (AS-16): блок остаётся, оглушения нет
 	};
 
 	struct WeaponDef
@@ -551,8 +559,10 @@ namespace
 		std::vector<FormFilter>      sources;
 		std::vector<FormFilter>      projectiles;
 		unsigned                     kinds{ 0 };
+		Tri                          playerWard{ Tri::kAny };
 		bool                         reach{ true };
 		float                        cooldown{ 4.0f };
+		float                        chip{ 10.0f };
 		std::vector<EffectId>        effects;
 		bool                         valid{ true };
 		Clock::time_point            lastFired{};
@@ -943,6 +953,15 @@ namespace
 		if (a_key == "attacker.shield") { return ParseTri(a_value, a_rule.attackerShield); }
 		if (a_key == "player.blocking") { return ParseTri(a_value, a_rule.playerBlocking); }
 		if (a_key == "player.shield") { return ParseTri(a_value, a_rule.playerShield); }
+		if (a_key == "player.ward") { return ParseTri(a_value, a_rule.playerWard); }
+		if (a_key == "chip") {
+			try {
+				a_rule.chip = std::stof(a_value);
+			} catch (...) {
+				return false;
+			}
+			return a_rule.chip >= 0.0f;
+		}
 		if (a_key == "attacker.weapon") {
 			a_rule.weapons.clear();
 			for (const auto& item : SplitList(a_value)) {
@@ -1017,7 +1036,7 @@ namespace
 	{
 		logs::info("правил загружено: {}", g_rules.size());
 		for (const auto& rule : g_rules) {
-			logs::info("  [{}]{} trigger={} hit={:02X} not={:02X} kind={} attacker.race={} attacker.weapon={} attacker.shield={} hit.source={} hit.projectile={} player.blocking={} player.shield={} reach={} do={}",
+			logs::info("  [{}]{} trigger={} hit={:02X} not={:02X} kind={} attacker.race={} attacker.weapon={} attacker.shield={} hit.source={} hit.projectile={} player.blocking={} player.shield={} player.ward={} reach={} chip={:.1f} do={}",
 				rule.name,
 				rule.valid ? "" : " (ОТКЛЮЧЕНО: ошибка в файле)",
 				TriggerText(rule.triggers),
@@ -1031,7 +1050,9 @@ namespace
 				FormsText(rule.projectiles),
 				TriText(rule.playerBlocking),
 				TriText(rule.playerShield),
+				TriText(rule.playerWard),
 				rule.reach,
+				rule.chip,
 				EffectsText(rule.effects));
 		}
 	}
@@ -1157,6 +1178,11 @@ namespace
 		if (!MatchTri(a_rule.playerShield, HasShield(a_player))) {
 			return false;
 		}
+		// Допущение AS-15: вард-спелл выставляет актёрскую величину kWardPower (ActorValues.h),
+		// поэтому «блок магией» читается напрямую из актёра, а не угадывается.
+		if (!MatchTri(a_rule.playerWard, HasWard(a_player))) {
+			return false;
+		}
 		if (!a_rule.weapons.empty()) {
 			const auto* weapon = GetEquippedWeapon(a_attacker);
 			if (!weapon) {
@@ -1197,9 +1223,10 @@ namespace
 		}
 	}
 
-	void RunEffect(EffectId a_effect, RE::Actor* a_source, const std::string& a_why)
+	void RunEffect(EffectId a_effect, RE::Actor* a_source, const Rule& a_rule)
 	{
-		auto* player = RE::PlayerCharacter::GetSingleton();
+		auto*     player = RE::PlayerCharacter::GetSingleton();
+		const std::string a_why = a_rule.name;
 		switch (a_effect) {
 		case EffectId::kStagger:
 			Stagger(a_source, a_why);
@@ -1210,6 +1237,14 @@ namespace
 		case EffectId::kBash:
 			if (player && a_source) {
 				OrderBash(a_source, a_source->GetPosition().GetDistance(player->GetPosition()), Clock::now());
+			}
+			break;
+		case EffectId::kChip:
+			// Урон сквозь блок: блок остаётся на месте, оглушения нет (укол кинжала/меча).
+			// DamageActorValue из ActorValueOwner — урон идёт мимо блокировки.
+			if (player && a_rule.chip > 0.0f) {
+				player->DamageActorValue(RE::ActorValue::kHealth, a_rule.chip);
+				logs::info("chip: {:.1f} hp сквозь блок ({})", a_rule.chip, a_why);
 			}
 			break;
 		}
@@ -1230,7 +1265,7 @@ namespace
 			a_source->GetName(),
 			EffectsText(a_rule.effects));
 		for (const auto effect : a_rule.effects) {
-			RunEffect(effect, a_source, a_rule.name);
+			RunEffect(effect, a_source, a_rule);
 		}
 	}
 
@@ -1334,7 +1369,7 @@ namespace
 		hit.kind = ClassifyAttack(hit.source);
 
 		if (g_hitLogged.fetch_add(1, std::memory_order_relaxed) < 20) {
-			logs::info("hit: actor={} kind={} flags={:02X} race={} source={} projectile={} игрок.блок={} игрок.щит={} враж.щит={}",
+			logs::info("hit: actor={} kind={} flags={:02X} race={} source={} projectile={} игрок.блок={} игрок.щит={} враж.щит={} вард={:.0f}",
 				a_attacker->GetName(),
 				KindText(hit.kind),
 				static_cast<unsigned>(hit.bits),
@@ -1343,7 +1378,8 @@ namespace
 				NameOf(hit.projectile),
 				player->IsBlocking(),
 				HasShield(player),
-				HasShield(a_attacker));
+				HasShield(a_attacker),
+				player->GetActorValue(RE::ActorValue::kWardPower));
 			const auto* heavyBlunt = GetHeavyBlunt(a_attacker);
 			if (heavyBlunt) {
 				logs::info("hit: у бьющего тяжёлое дробящее — {}", heavyBlunt->GetName());

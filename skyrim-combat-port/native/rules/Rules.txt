@@ -17,8 +17,10 @@
 #   hit.projectile  = <форма>        снаряд: болт, стрела, файрбол (TESHitEvent::projectile)
 #   player.blocking = yes | no | any
 #   player.shield   = yes | no | any
+#   player.ward     = yes | no | any     поднят ли у игрока вард (Малый Оберег и др.)
 #   reach           = yes | no       проверять дистанцию fCombatBashReach
 #   cooldown        = секунды между срабатываниями правила
+#   chip            = сколько здоровья снимает эффект chip (по умолчанию 10)
 #   do              = unblock, stagger, bash   (порядок сохраняется)
 #
 # ── как записывать формы (раса, оружие, снаряд, заклинание) ────────────────────
@@ -31,6 +33,7 @@
 #   unblock  — снять блок у игрока и удерживать снятым ~1 с
 #   stagger  — стаггер спеллом от имени бьющего (дезориентация)
 #   bash     — заказать бьющему баш
+#   chip     — снять N здоровья СКВОЗЬ блок (блок остаётся, оглушения нет)
 
 [bandit-bash-breaks-weapon-block]
 # Щитоносец выбивает из блока того, кто блокирует оружием или кулаками (правило 1).
@@ -95,3 +98,40 @@ cooldown = 4
 #player.blocking = yes
 #do = unblock, stagger
 #cooldown = 4
+
+# ── уколы: силовая атака кинжала и меча ────────────────────────────────────────
+# Включены: это механика «укол проходит сквозь блок, но не снимает его».
+
+[dagger-thrust-through-any-block]
+# Кинжал: укол юркий, проходит и блок оружием, и блок щитом (урон, без оглушения).
+trigger = hit
+hit-flags = blocked, power
+attacker.weapon = dagger
+player.blocking = yes
+do = chip
+chip = 10
+cooldown = 0
+
+[sword-thrust-through-weapon-block]
+# Меч: укол проходит блок оружием, но щит его останавливает.
+trigger = hit
+hit-flags = blocked, power
+attacker.weapon = sword
+player.blocking = yes
+player.shield = no
+do = chip
+chip = 8
+cooldown = 0
+
+# ── блок магией (вард) ────────────────────────────────────────────────────────
+# Включено: вард виден правилам. Молот его НЕ пробивает — правило ниже сознательно
+# отсутствует; снимать вард должна антимагия (эффект dispel появится отдельной задачей).
+[dagger-thrust-through-ward]
+# Кинжал проходит и сквозь оберег: магия останавливает заклинания, а не тонкий клинок.
+trigger = hit
+hit-flags = blocked, power
+attacker.weapon = dagger
+player.ward = yes
+do = chip
+chip = 6
+cooldown = 0

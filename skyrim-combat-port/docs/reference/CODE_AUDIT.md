@@ -22,6 +22,7 @@
 | `SKSE_PLUGIN_LOAD` | стандартная точка входа SKSE; версия рантайма логируется | — | `TGCombatPort v0-7-1-0` первой строкой **[A]** |
 | `RegisterPapyrusFunctions` | `IVirtualMachine::RegisterFunction`, имена совпадают с `TGCP_Native.psc` | — | `Papyrus functions registered: …` **[A]** |
 | `HasShield` | щит = `TESObjectARMO::IsShield()` в экипированной руке; UESP: блокировать можно щитом/оружием **[B]** | — | `diag: … shield=True/False` **[A]** |
+| `HasWard` | `Actor::GetActorValue(kWardPower)`; величины `kWardPower = 63`, `kWardDeflection = 67` объявлены в `RE/A/ActorValues.h` **[A]** | `AS-15` | `hit: … вард=40` при поднятом Малом Обереге |
 | `GetHeavyBlunt` | `kOneHandMace`, `kTwoHandAxe` (`WEAPON_TYPE`); двуручный топор отдельного типа не имеет **[B]** | — | `hit без эффекта: … оружие=Стальная булава` |
 | `GetBashEventNames` | `TESRace::attackDataMap` + флаг `kBashAttack` (структура `AttackData`) **[A]** | — | `race attack data: … bash-событий: 2` **[A]** |
 | `IsWatchedBash` | только свои заказы (иначе вмешивались бы в ванильный AI) | — | — |
