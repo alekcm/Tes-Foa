@@ -35,6 +35,7 @@
 | [`CODE_AUDIT.md`](CODE_AUDIT.md) | аудит: каждая функция кода и каждое число — с указанием источника проверки |
 | [`wildcat-analysis.md`](wildcat-analysis.md) | что реально делает `Wildcat - Combat of Skyrim.esp`: части тела, ранения, стаггер, переопределённые `GMST` (разбор парсером `tools/esp_dump.py`) |
 | [`../weapons-and-effects.md`](../weapons-and-effects.md) | справочник «оружие → что пробивает → какой эффект» |
+| [`apocalypse-spells.md`](apocalypse-spells.md) | что делает каждое заклинание Apocalypse 9.45.0 (описания мода, сверенные с `.esp`) |
 | [`wiki/`](wiki/README.md) | локальная копия нужных страниц UESP и CK Wiki (цитаты) |
 
 ## Машиночитаемые проверки
