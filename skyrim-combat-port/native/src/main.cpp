@@ -331,6 +331,63 @@ namespace
 			a_distance);
 	}
 
+	// Самодиагностика: раз в 3 с во время боя пишет, что вокруг игрока.
+	// Нужна, чтобы не устраивать «найди волка и подерись» — данных хватает из любого боя.
+	void LogDiagnostics(RE::PlayerCharacter* a_player, Clock::time_point a_now)
+	{
+		static Clock::time_point lastDiag{};
+		if (lastDiag.time_since_epoch().count() != 0 &&
+			std::chrono::duration<float>(a_now - lastDiag).count() < 3.0f) {
+			return;
+		}
+		lastDiag = a_now;
+
+		const auto* processLists = RE::ProcessLists::GetSingleton();
+		if (!processLists) {
+			return;
+		}
+
+		const bool blocking = a_player->IsBlocking();
+		const bool withShield = blocking && HasShield(a_player);
+		int found = 0;
+		int shown = 0;
+		std::string line;
+
+		for (const auto* handles : { &processLists->highActorHandles, &processLists->middleHighActorHandles }) {
+			for (const auto& handle : *handles) {
+				auto* actor = handle.get().get();
+				if (!actor || actor == a_player) {
+					continue;
+				}
+				const float distance = actor->GetPosition().GetDistance(a_player->GetPosition());
+				if (distance > 300.0f || !actor->IsInCombat() || !actor->IsHostileToActor(a_player)) {
+					continue;
+				}
+				++found;
+				if (shown >= 3) {
+					continue;
+				}
+				++shown;
+
+				const auto* weapon = actor->GetEquippedObject(false);
+				const auto* armo = weapon ? weapon->As<RE::TESObjectARMO>() : nullptr;
+				line += std::format("\n  {} dist={:.0f} shield={} weapon={} blocking={} attacking={}",
+					actor->GetName(),
+					distance,
+					HasShield(actor),
+					(weapon && !armo) ? weapon->GetName() : (armo && armo->IsShield() ? "<щит>" : "?"),
+					actor->IsBlocking(),
+					actor->IsAttacking());
+			}
+		}
+
+		logs::info("diag: blocking={} withShield={} hostiles={}{}",
+			blocking,
+			withShield,
+			found,
+			line);
+	}
+
 	void ConsiderActor(RE::Actor* a_actor, RE::PlayerCharacter* a_player, bool a_playerBlocksWithShield, Clock::time_point a_now)
 	{
 		if (!a_actor || a_actor == a_player) {
@@ -383,7 +440,15 @@ namespace
 		}
 
 		auto* player = RE::PlayerCharacter::GetSingleton();
-		if (!player || !player->IsBlocking()) {
+		if (!player) {
+			return;
+		}
+
+		if (player->IsInCombat()) {
+			LogDiagnostics(player, now);
+		}
+
+		if (!player->IsBlocking()) {
 			return;
 		}
 

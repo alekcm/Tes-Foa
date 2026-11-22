@@ -34,8 +34,9 @@ Import TGCP_Native
 
 GlobalVariable Property PlayerBlocking Auto
 
-; Как часто звать TGCP_Native.Tick(), пока игрок держит блок.
-Float TickInterval = 0.25
+; Как часто звать TGCP_Native.Tick().
+Float TickInterval = 0.5        ; обычный шаг в бою
+Float BlockTickInterval = 0.25  ; пока игрок держит блок — чаще
 
 Bool Registered
 
@@ -77,21 +78,30 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
     If asEventName == "blockStart" || asEventName == "blockStartOut"
         PlayerBlocking.SetValue(1.0)
         Debug.Trace("[TGCP] player block start (" + asEventName + ")")
-        RegisterForSingleUpdate(TickInterval)
+        RegisterForSingleUpdate(BlockTickInterval)
     ElseIf asEventName == "blockStop"
         PlayerBlocking.SetValue(0.0)
         Debug.Trace("[TGCP] player block stop (" + asEventName + ")")
     EndIf
 EndEvent
 
-; Пока игрок блокирует — крутим Tick. Как только блок снят, делаем ещё один Tick,
-; чтобы плагин закрыл открытые окна, и останавливаемся.
+; Тик крутится, пока игрок в бою: плагин сам решает, что делать (и пишет диагностику
+; раз в 3 с), поэтому отдельные сценарии для проверки не нужны.
+Event OnCombatStateChanged(Actor akActor, int aeCombatState)
+    If aeCombatState == 1
+        RegisterForSingleUpdate(BlockTickInterval)
+    EndIf
+EndEvent
+
 Event OnUpdate()
     Actor player = GetActorReference()
-    If player != None && TGCP_Native.IsBlocking(player)
-        TGCP_Native.Tick()
+    If player == None
+        Return
+    EndIf
+
+    TGCP_Native.Tick()
+
+    If player.IsInCombat()
         RegisterForSingleUpdate(TickInterval)
-    Else
-        TGCP_Native.Tick()
     EndIf
 EndEvent
