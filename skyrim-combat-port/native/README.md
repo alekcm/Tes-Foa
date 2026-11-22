@@ -3,7 +3,7 @@
 Здесь лежит C++ часть мода. Она нужна только для того, чего не умеет Papyrus:
 точное чтение состояния анимации и (в перспективе) управление действиями NPC.
 
-## Что уже есть (0.5.0)
+## Что уже есть (0.6.0)
 
 Хуков (патчинга кода игры) нет: версия 0.1.1 патчила `Actor::GetAttackChance` и вызывала вылет, способ убран.
 
@@ -30,6 +30,20 @@ Papyrus-функции скрипта `TGCP_Native`:
 только через animation event — это тот же механизм, что `Debug.SendAnimationEvent`, но вызванный из DLL,
 с нашими проверками (враждебен, в бою, дистанция, не атакует, кулдаун). Риск рассинхрона анимации NPC
 у этого механизма документирован. Пункт 2 ничего не подделывает: меняются только числа `CombatStyle`.
+
+### 0.6.0: самодиагностика — сценарии для проверки больше не нужны
+
+Скрипт `TGCP_PlayerBlockWatcher` теперь крутит `Tick()` всё время, пока игрок **в бою** (0,5 с; в блоке —
+0,25 с), а не только в блоке. Раз в 3 секунды плагин сам пишет в лог состояние боя:
+
+```
+diag: blocking=False withShield=False hostiles=2
+  Бандит dist=140 shield=True weapon=<щит> blocking=False attacking=True
+  Бандит dist=210 shield=False weapon=Железный меч blocking=False attacking=False
+```
+
+Этого достаточно, чтобы разбирать любую обычную драку: кто рядом, со щитом или без, чем вооружён,
+блокирует/атакует ли. Отдельно искать «волка в мире» и разыгрывать сценарий не нужно.
 
 ### 0.5.0: имя события подтверждено игрой
 
@@ -82,7 +96,7 @@ xmake build
 
 Собранный плагин публикуется как GitHub Release по тегу `v*`:
 
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.5.0/TGCombatPort-v0.5.0.zip —
+- https://github.com/alekcm/Tes-Foa/releases/download/v0.6.0/TGCombatPort-v0.6.0.zip —
   архив с `SKSE/Plugins/TGCombatPort.dll`, распаковывается в папку `Data` игры
   или ставится как обычный мод в Vortex.
 
@@ -96,21 +110,21 @@ xmake build
 ## Проверка, что установилась нужная версия
 
 Первая строка лога `Documents\My Games\Skyrim Special Edition\SKSE\TGCombatPort.log` содержит версию
-плагина, например `TGCombatPort v0-5-0-0`. Если там старая версия — игра грузит старый файл:
+плагина, например `TGCombatPort v0-6-0-0`. Если там старая версия — игра грузит старый файл:
 
 - браузер мог сохранить новый файл как `TGCombatPort (1).dll`; проверьте оба пути
   (`dir "%USERPROFILE%\Downloads\TGCombatPort*.dll"`) и скопируйте нужный с переименованием;
 - если мод стоит в **Vortex**, он раскладывает файлы в `Data` сам при развёртывании и может вернуть
   старую версию поверх ручной копии. В этом случае ставить надо архив
-  (`TGCombatPort-v0.5.0.zip`) через Vortex → Install From File, а не копированием.
+  (`TGCombatPort-v0.6.0.zip`) через Vortex → Install From File, а не копированием.
 
 ## Установка (для проверки)
 
-1. Скачать `TGCombatPort-v0.5.0.zip` по ссылке выше.
+1. Скачать `TGCombatPort-v0.6.0.zip` по ссылке выше.
 2. Распаковать в папку `Data` игры (cmd):
 
 ```cmd
-tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.5.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
+tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.6.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
 ```
 
 3. Поставить **Address Library v13** (Nexus, мод 32444, файл для 1.6+) — без него DLL не загрузится.
