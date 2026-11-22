@@ -403,8 +403,8 @@ namespace
 		}
 		// Щит должен быть в руке: пока оружие/щит не вынуты, тот же bashStart граф играет
 		// кулаком, и баш «рукой» — это ровно пропущенная проверка, а не другой баш.
-		const auto* state = a_actor->AsActorState();
-		if (!state || !state->IsWeaponDrawn()) {
+		const auto* actorState = a_actor->AsActorState();
+		if (!actorState || !actorState->IsWeaponDrawn()) {
 			if (g_rejectLogged.fetch_add(1, std::memory_order_relaxed) < 5) {
 				logs::info("skip: actor={} оружие/щит не вынуты, баш будет кулаком", a_actor->GetName());
 			}
