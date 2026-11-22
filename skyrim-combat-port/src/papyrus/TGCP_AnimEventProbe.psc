@@ -4,20 +4,29 @@
 ; реально приходят из игры и в каком порядке. Скрипт ничего не меняет в бою:
 ; он только пишет строки в Papyrus-лог.
 ;
-; Как использовать:
-;   1. Скомпилировать вместе с остальными скриптами мода (python tools/build.py).
-;   2. В Creation Kit создать Quest с алиасом на игрока (или на тестового NPC),
-;      повесить на алиас этот скрипт.
-;   3. Включить логи Papyrus, войти в бой, подержать блок, получить bash/атаку.
-;   4. Найти в Papyrus.0.log строки с префиксом [TGCP].
+; Что уже известно из игры (22.11.2026, версия 1 списка из 12 имён):
+;   пришли:     blockStop, attackStop, bashStop, IdleStop
+;   НЕ пришли:  blockStart, attackStart, attackRelease, bashStart, staggerStart,
+;               staggerStop, JumpUp, JumpDown
+; Поэтому список расширен: добавлены варианты blockHit*, blockAnticipate*,
+; blockStartOut/blockStopOut, blockStopInstant, attackStart_Attack1, preHitFrame,
+; weaponSwing, bashRelease, recoilStart, weaponDraw, weaponSheathe, AttackStart.
 ;
-; Имена в списке — кандидаты. Если каких-то событий нет, в логе их просто не будет;
-; важно увидеть реальный набор, а не подтвердить этот список.
+; Как использовать:
+;   1. Пересобрать скрипты (python tools/build.py --name TGCombatPort --version ... --skip-package)
+;      и скопировать .pex в Data\Scripts. Плагин переделывать в CK не нужно: скрипт тот же.
+;   2. Загрузить игру. Тест: 3 секунды держать блок, отпустить, махнуть оружием 5 раз,
+;      подержать блок и нажать атаку (bash), прыгнуть.
+;   3. Найти в Papyrus.0.log строки с префиксом [TGCP].
+;
+; IdleStop приходит десятками раз в секунду, поэтому его запись ограничена:
+; не чаще одной строки в 10 секунд. Остальные события пишутся как есть.
 
 ScriptName TGCP_AnimEventProbe extends ReferenceAlias
 
 String[] EventNames
 Bool Registered
+Float LastIdleTrace
 
 Event OnInit()
     Setup()
@@ -33,19 +42,31 @@ Function Setup()
         Return
     EndIf
 
-    EventNames = new String[12]
+    EventNames = new String[24]
     EventNames[0] = "blockStart"
     EventNames[1] = "blockStop"
-    EventNames[2] = "bashStart"
-    EventNames[3] = "bashStop"
-    EventNames[4] = "attackStart"
-    EventNames[5] = "attackStop"
-    EventNames[6] = "attackRelease"
-    EventNames[7] = "staggerStart"
-    EventNames[8] = "staggerStop"
-    EventNames[9] = "JumpUp"
-    EventNames[10] = "JumpDown"
-    EventNames[11] = "IdleStop"
+    EventNames[2] = "blockStartOut"
+    EventNames[3] = "blockStopOut"
+    EventNames[4] = "blockStopInstant"
+    EventNames[5] = "blockHitStart"
+    EventNames[6] = "blockHitStop"
+    EventNames[7] = "blockAnticipateStart"
+    EventNames[8] = "blockAnticipateStop"
+    EventNames[9] = "bashStart"
+    EventNames[10] = "bashStop"
+    EventNames[11] = "bashRelease"
+    EventNames[12] = "attackStart"
+    EventNames[13] = "attackStart_Attack1"
+    EventNames[14] = "AttackStart"
+    EventNames[15] = "attackStop"
+    EventNames[16] = "attackRelease"
+    EventNames[17] = "preHitFrame"
+    EventNames[18] = "weaponSwing"
+    EventNames[19] = "staggerStart"
+    EventNames[20] = "staggerStop"
+    EventNames[21] = "recoilStart"
+    EventNames[22] = "weaponDraw"
+    EventNames[23] = "IdleStop"
 
     Actor akTarget = GetActorReference()
     If akTarget == None
@@ -59,10 +80,21 @@ Function Setup()
         i += 1
     EndWhile
 
+    LastIdleTrace = 0.0
     Registered = True
     Debug.Trace("[TGCP] probe: registered " + EventNames.Length + " candidate events on " + akTarget)
 EndFunction
 
 Event OnAnimationEvent(ObjectReference akSource, string asEventName)
-    Debug.Trace("[TGCP] anim event: " + asEventName + " | source=" + akSource + " | self=" + GetActorReference())
+    If asEventName == "IdleStop"
+        Float now = Utility.GetCurrentRealTime()
+        If now - LastIdleTrace < 10.0
+            Return
+        EndIf
+        LastIdleTrace = now
+        Debug.Trace("[TGCP] event IdleStop (записан один раз в 10 секунд)")
+        Return
+    EndIf
+
+    Debug.Trace("[TGCP] event " + asEventName + " | source=" + akSource)
 EndEvent

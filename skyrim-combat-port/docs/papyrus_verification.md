@@ -17,6 +17,40 @@
 | `GlobalVariable.SetValue(float)` | стандартная функция `GlobalVariable` | — | — |
 | `Utility.GetCurrentRealTime()` | стандартная функция `Utility`, секунды реального времени | переживает ли сохранение/загрузку как ожидается | хранить время в глобале, если нужно пережить перезапуск |
 
+## Что показал первый запуск в игре (22.11.2026)
+
+Лог `Papyrus.0.log` (05:10:51–05:13:05), старый сейв, Vortex, runtime 1.7.104.0.
+
+Работает:
+- квест `TGCP_MainQuest` стартует на загруженном сохранении (не только на новой игре);
+- алиас заполнился игроком: `[TGCP] block watcher registered on [Actor < (00000014)>]`;
+- `RegisterForAnimationEvent` принимает все 12 имён без ошибок: `probe: registered 12 candidate events`;
+- `OnAnimationEvent` приходит и несёт имя события: `anim event: IdleStop | source=[Actor < (00000014)>]`;
+- `GlobalVariable.SetValue` работает: по `blockStop` в лог ушло `player block stop`.
+
+Пришли события (40 строк `[TGCP]` за 2 минуты):
+| Событие | Сколько раз | Вывод |
+|---|---|---|
+| `IdleStop` | 29 | приходит постоянно, в реальной логике не использовать — шум |
+| `attackStop` | 4 | приходит |
+| `blockStop` | 2 | приходит |
+| `bashStop` | 1 | приходит |
+
+НЕ пришли ни разу: `blockStart`, `attackStart`, `attackRelease`, `bashStart`, `staggerStart`, `staggerStop`,
+`JumpUp`, `JumpDown`.
+
+Что это значит для дизайна: признак «игрок блокирует» в том виде, как задумано (по `blockStart`), пока не
+подтверждён — в логе только завершение блока. Прежде чем менять механику, список имён расширен
+(`TGCP_AnimEventProbe` v2: `blockHitStart`, `blockAnticipateStart`, `blockStartOut`, `preHitFrame`,
+`weaponSwing`, `attackStart_Attack1` и др.) — нужен повторный прогон.
+
+Запасные варианты, если `*Start` не придут:
+1. Проверять состояние блока по факту попадания в блок (`blockHitStart`/`blockHitStop`) — без SKSE.
+2. `GetAnimationVariableBool("Isblocking")` — только с SKSE (в Papyrus-функции `IsBlocking` нет;
+   условие `IsBlocking` в CK внутри вызывает именно эту проверку графа).
+3. Условная способность (ability) с условием `IsBlocking == 1` — без SKSE, но проверяется на событиях,
+   а не мгновенно; требует отдельного теста.
+
 ## Чего мы сознательно не используем
 
 - **`DoCombatSpellCast`** — в найденной документации для Skyrim не подтверждён (в списках фигурирует
