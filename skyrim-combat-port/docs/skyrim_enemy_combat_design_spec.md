@@ -106,3 +106,16 @@ For each family, run the same-level/equipment 1v1 and a mixed encounter. Hide en
 Workbook `SK_Enemy_Port_Plan` now has exact move/cooldown and counterplay columns for all 42 archetype families; `FoA_Enemy_Inspirations` keeps source inspiration separate from invented Skyrim behavior. The Markdown document is the game-design source of truth. The earlier broad brief is retained for technical architecture only.
 
 **No mod implementation is present.** Animations, sounds, AI behavior graphs, spells/records, plugin distribution and in-game tests remain future production tasks. The implementation chat should preserve the attack loops and ask about specific technical impossibilities; it should not make new design decisions silently.
+
+## Поправка 22.11.2026: чем именно пробивается блок (решение пользователя)
+
+Правило для щитоносцев заменяет прежнюю формулировку «shield feint → bash» на две ветки:
+
+| Что делает игрок | Ответ врага | Обоснование |
+|---|---|---|
+| Блокирует **не щитом** (оружием, кулаками) | щитоносец выбивает игрока из блока **башем** | у блока без щита нет «жёсткой» стойки, баш её ломает |
+| Блокирует **щитом** | щит пробивается **силовой атакой** того, у кого булава или двуручный молот | щит держит обычный удар, но не тяжёлое пробивание |
+| Не блокирует | обычная атака/комбо, без баша | баш не должен быть неожиданностью вне блока |
+
+Кулдаун на баш и на силовое пробивание — 7 с на одного врага. Реализация: `native/` (SKSE-плагин),
+описание правил и логов — в `native/README.md`.
