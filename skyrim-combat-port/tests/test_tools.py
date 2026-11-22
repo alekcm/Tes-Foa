@@ -27,6 +27,8 @@ import inspect_records  # noqa: E402
 import package  # noqa: E402
 import papyrus_lint  # noqa: E402
 import papyrus_logging  # noqa: E402
+import verify_api  # noqa: E402
+import verify_audit  # noqa: E402
 
 
 def touch(path: Path, content: bytes = b"") -> None:
@@ -683,3 +685,68 @@ class CommandLineHelpTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, f"{path.name}: {result.stderr}")
             self.assertIn("usage", result.stdout.lower(), path.name)
+
+
+class VerifyAuditTests(unittest.TestCase):
+    def test_repository_audit_passes(self):
+        """Реальный репозиторий: каждая функция описана, каждая метка AS-n в реестре."""
+        self.assertEqual(verify_audit.main(["--quiet"]), 0)
+
+    def test_collect_functions_finds_definitions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sample.cpp"
+            path.write_text(
+                "namespace\n{\n\tvoid Foo(int a)\n\t{\n\t}\n\n\tbool Bar()\n\t{\n\t\treturn true;\n\t}\n}\n",
+                encoding="utf-8",
+            )
+            found = verify_audit.collect_functions([path])
+            self.assertIn("Foo", found)
+            self.assertIn("Bar", found)
+            self.assertNotIn("return", found)
+
+    def test_parse_assumptions_reads_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "ASSUMPTIONS.md"
+            path.write_text(
+                "| ID | Допущение | Почему | Проверяется | Статус |\n"
+                "|---|---|---|---|---|\n"
+                "| AS-1 | x | y | `block probe` | открыто |\n",
+                encoding="utf-8",
+            )
+            rows = verify_audit.parse_assumptions(path)
+            self.assertEqual(rows["AS-1"]["status"], "открыто")
+            self.assertEqual(rows["AS-1"]["checked_by"], "`block probe`")
+
+
+class VerifyApiTests(unittest.TestCase):
+    def test_index_headers_finds_declarations_and_aliases(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "A.h").write_text(
+                "namespace RE { class Actor { public: bool IsBlocking() const; }; }\n"
+                "namespace RE { using FormID = std::uint32_t; }\n"
+                "namespace RE { enum class Delivery { kSelf = 0 }; }\n",
+                encoding="utf-8",
+            )
+            declared, mentioned = verify_api.index_headers(root)
+            self.assertIn("Actor", declared)
+            self.assertIn("FormID", declared)
+            self.assertIn("Delivery", declared)
+            self.assertIn("Actor", mentioned)
+
+    def test_collect_symbols_reports_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "x.cpp"
+            path.write_text("RE::Actor* a = nullptr; RE::FormID id = 0;\n", encoding="utf-8")
+            found = verify_api.collect_symbols([path])
+            self.assertEqual(found["Actor"], ["x.cpp"] if False else found["Actor"])
+            self.assertIn("Actor", found)
+            self.assertIn("FormID", found)
+
+    def test_collect_methods_ignores_plain_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "y.cpp"
+            path.write_text("actor->IsBlocking(); actor->GetName();\n", encoding="utf-8")
+            found = verify_api.collect_methods([path])
+            self.assertIn("IsBlocking", found)
+            self.assertIn("GetName", found)

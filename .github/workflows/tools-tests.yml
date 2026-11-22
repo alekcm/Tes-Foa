@@ -6,6 +6,8 @@ on:
       - "skyrim-combat-port/tools/**"
       - "skyrim-combat-port/tests/**"
       - "skyrim-combat-port/src/**"
+      - "skyrim-combat-port/native/src/**"
+      - "skyrim-combat-port/docs/reference/**"
       - ".github/workflows/tools-tests.yml"
   pull_request:
     paths:
@@ -37,3 +39,11 @@ jobs:
 
       - name: Docs links
         run: python tools/check_docs.py
+
+      # Аудит: каждая функция C++ описана в CODE_AUDIT.md, каждая метка AS-n есть в реестре допущений.
+      - name: Audit ledger
+        run: python tools/verify_audit.py
+
+      # API: каждый символ RE:: и каждый вызываемый метод существуют в закреплённых заголовках CommonLibSSE-NG.
+      - name: API against CommonLib headers
+        run: python tools/verify_api.py --clone --methods

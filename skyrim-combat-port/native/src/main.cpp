@@ -234,6 +234,8 @@ namespace
 	}
 
 	// Накладываем стаггер на игрока от имени NPC: caster — сам NPC, target — игрок.
+	// Допущения: AS-1 (стаггер снимает блок у игрока), AS-2 (magnitude 1.0 даёт видимый стаггер),
+	// AS-4 (CastSpellImmediate не требует анимации каста).
 	void ApplyStagger(RE::Actor* a_source, const char* a_why)
 	{
 		auto* player = RE::PlayerCharacter::GetSingleton();
@@ -276,7 +278,7 @@ namespace
 			std::chrono::duration<float>(a_now - g_lastStagger).count() < kStaggerCooldown;
 	}
 
-	// Пробы: печатаем, что стало с игроком после стаггера. Это и есть проверка механики —
+	// Пробы: печатаем, что стало с игроком после стаггера. Допущение AS-7 (IsStaggering у игрока). Это и есть проверка механики —
 	// она сама пишет в лог, вышел ли игрок из блока.
 	void ProcessBlockProbes(Clock::time_point a_now)
 	{
@@ -299,6 +301,7 @@ namespace
 	}
 
 	// Правило 1: щитоносец закончил замах баша.
+	// Допущения: AS-3 (bashStop = конец замаха), AS-8 (момент совпадает с «щит достал»).
 	void OnBashFinished(RE::Actor* a_actor)
 	{
 		if (!a_actor || !IsWatchedBash(a_actor)) {
@@ -341,6 +344,7 @@ namespace
 	}
 
 	// Правило 2: силовая атака булавы/двуручника по блокирующему щитом игроку.
+	// Допущение AS-5 (события attackPowerStart* доходят до слушателя).
 	void OnPowerAttackStarted(RE::Actor* a_actor, std::string_view a_tag)
 	{
 		if (!a_actor) {
@@ -370,6 +374,7 @@ namespace
 	}
 
 	// Слежка за силовыми атаками NPC с булавой/двуручником, пока игрок блокирует щитом.
+	// Допущение AS-5.
 	void RefreshPowerWatches(Clock::time_point a_now)
 	{
 		for (auto it = g_powerWatches.begin(); it != g_powerWatches.end();) {
@@ -567,6 +572,7 @@ namespace
 		}
 		// Щит должен быть в руке: пока оружие/щит не вынуты, тот же bashStart граф играет
 		// кулаком, и баш «рукой» — это ровно пропущенная проверка, а не другой баш.
+		// Допущение AS-6 (семантика ActorState::IsWeaponDrawn для «щит в руке»).
 		const auto* actorState = a_actor->AsActorState();
 		if (!actorState || !actorState->IsWeaponDrawn()) {
 			if (g_rejectLogged.fetch_add(1, std::memory_order_relaxed) < 5) {
