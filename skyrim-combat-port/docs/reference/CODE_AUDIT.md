@@ -27,7 +27,8 @@
 | `IsWatchedBash` | только свои заказы (иначе вмешивались бы в ванильный AI) | — | — |
 | `InitStaggerSpell` | `MagicItem::HasEffect(EffectArchetype::kStagger)`; CK Wiki: архетип и смысл magnitude/duration **[B]** | — | `stagger spell: …`, `stagger: выбран спелл …` |
 | `StaggerOnCooldown` | наша логика (4 с) | — | — |
-| `ApplyStagger` | `MagicCaster::CastSpellImmediate` (VTABLE 01); `MagicSystem::CastingSource::kInstant` **[A]** | `AS-1`, `AS-2`, `AS-4` | `stagger cast: … mag=1.00` |
+| `KickBlock` | своего API для блока нет (`verify_api.py`), состояние блока живёт в графе; `blockStop` — событие графа **[A]/[B]** | `AS-10` | `block kick: … blockStop sent=true` |
+| `ApplyStagger` | `MagicCaster::CastSpellImmediate` (VTABLE 01); `MagicSystem::CastingSource::kInstant` **[A]** | `AS-2`, `AS-4`, `AS-10` (`AS-1` опровергнуто) | `stagger cast: … mag=1.00` |
 | `ProcessBlockProbes` | `Actor::IsBlocking()`, `Actor::IsStaggering()` **[A]** | `AS-7` | `block probe: … blocking=… staggered=…` |
 | `ReadEngineSettings` | `GameSettingCollection::GetSetting`, `Setting::GetFloat` **[A]**; `fCombatBashReach = 141` **[B]** | `AS-9` | `fCombatBashReach = 141 (дистанция баша)` |
 | `HitSink::ProcessEvent` | `BSTEventSink<TESHitEvent>` + `ScriptEventSourceHolder::AddEventSink` **[A]** | `AS-5` | `hit sink registered (TESHitEvent)` |

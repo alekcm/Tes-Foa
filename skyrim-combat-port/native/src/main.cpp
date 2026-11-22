@@ -364,9 +364,22 @@ namespace
 			std::chrono::duration<float>(a_now - g_lastStagger).count() < kStaggerCooldown;
 	}
 
+	// Снять блок у игрока: граф понимает blockStop (лог 0.6.2/0.7.1: событие доходит и от него
+	// зависит состояние блока). Своего API для блока в движке нет — tools/verify_api.py это подтверждает.
+	// Допущение AS-10: blockStop во время стаггера действительно гасит блок и он не возвращается,
+	// пока игрок стаггерится.
+	void KickBlock(RE::PlayerCharacter* a_player, const char* a_why)
+	{
+		if (!a_player || !a_player->IsBlocking()) {
+			return;
+		}
+		const bool sent = a_player->NotifyAnimationGraph(RE::BSFixedString("blockStop"));
+		logs::info("block kick: {} → blockStop sent={}", a_why, sent);
+	}
+
 	// Накладываем стаггер на игрока от имени NPC: caster — сам NPC, target — игрок.
-	// Допущения: AS-1 (стаггер снимает блок у игрока), AS-2 (magnitude 1.0 даёт видимый стаггер),
-	// AS-4 (CastSpellImmediate не требует анимации каста).
+	// AS-1 опровергнуто логом 0.7.1: стаггер НЕ снимает блок у игрока, поэтому блок гасим отдельно
+	// (AS-10, KickBlock). Подтверждены: AS-2 (стаггер виден), AS-4 (каст без анимации).
 	void ApplyStagger(RE::Actor* a_source, const char* a_why)
 	{
 		auto* player = RE::PlayerCharacter::GetSingleton();
@@ -401,6 +414,10 @@ namespace
 			g_staggerSpell->GetFormID(),
 			kStaggerMagnitude,
 			player->IsBlocking());
+
+		// Стаггер у ИГРОКА блок не прерывает (лог 0.7.1: blocking=true при staggered=true),
+		// поэтому снимаем блок тем же событием, которым это делает сам граф. Допущение AS-10.
+		KickBlock(player, a_why);
 	}
 
 	// Пробы: печатаем, что стало с игроком после стаггера. Допущение AS-7 (IsStaggering у игрока).
@@ -417,10 +434,13 @@ namespace
 				++it;
 				continue;
 			}
-			logs::info("block probe: {} blocking={} staggered={}",
-				it->source,
-				player->IsBlocking(),
-				player->IsStaggering());
+			const bool blocking = player->IsBlocking();
+			const bool staggered = player->IsStaggering();
+			logs::info("block probe: {} blocking={} staggered={}", it->source, blocking, staggered);
+			if (blocking && staggered) {
+				// Блок вернулся, пока игрок ещё в стаггере — гасим снова (AS-10).
+				KickBlock(player, it->source.c_str());
+			}
 			it = g_blockProbes.erase(it);
 		}
 	}

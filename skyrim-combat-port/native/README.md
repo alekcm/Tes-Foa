@@ -3,7 +3,7 @@
 Здесь лежит C++ часть мода. Она нужна только для того, чего не умеет Papyrus:
 точное чтение состояния анимации и (в перспективе) управление действиями NPC.
 
-## Что уже есть (0.7.1)
+## Что уже есть (0.7.2)
 
 Хуков (патчинга кода игры) нет: версия 0.1.1 патчила `Actor::GetAttackChance` и вызывала вылет, способ убран.
 
@@ -64,6 +64,24 @@ stagger applied: баш щитоносца, игрок блокирует без
 Пошагово, для первого раза: [`docs/console_spawn.md`](../docs/console_spawn.md). Коротко: `ё` —
 консоль, `help draugr 4`, клик по строке, `player.placeatme <ID> 1`, Enter. Для проверки механики
 это не требуется: она срабатывает в любой драке с бандитом, у которого есть щит.
+
+### 0.7.2: блок снимаем отдельно от стаггера
+
+Лог 0.7.1 показал главное: стаггер на игрока **накладывается** (`staggered=true`, пользователь его
+чувствует), но блок при этом **не прерывается** (`blocking=true` в тех же пробах). UESP и моддеры
+предупреждали, что у игрока стаггер не блокирует управление полностью — это подтвердилось.
+
+Поэтому 0.7.2 после наложения стаггера отправляет игроку `blockStop` — событие того же графа анимаций,
+которым движок сам переключает состояние блока (своего API для блока нет, это проверяет
+`tools/verify_api.py`). Отправка повторяется в моменты проб, пока игрок ещё стаггерится,
+и логируется каждая попытка:
+
+```
+block kick: баш щитоносца (заказ) → blockStop sent=true
+block probe: баш щитоносца (заказ) blocking=false staggered=true
+```
+
+`blocking=false` при `staggered=true` — это и есть «выбило из блока».
 
 ### 0.7.1: 0.7.0 переписана по источникам
 
@@ -191,7 +209,7 @@ xmake build
 
 Собранный плагин публикуется как GitHub Release по тегу `v*`:
 
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.7.1/TGCombatPort-v0.7.1.zip —
+- https://github.com/alekcm/Tes-Foa/releases/download/v0.7.2/TGCombatPort-v0.7.2.zip —
   архив с `SKSE/Plugins/TGCombatPort.dll`, распаковывается в папку `Data` игры
   или ставится как обычный мод в Vortex.
 
@@ -211,15 +229,15 @@ xmake build
   (`dir "%USERPROFILE%\Downloads\TGCombatPort*.dll"`) и скопируйте нужный с переименованием;
 - если мод стоит в **Vortex**, он раскладывает файлы в `Data` сам при развёртывании и может вернуть
   старую версию поверх ручной копии. В этом случае ставить надо архив
-  (`TGCombatPort-v0.7.1.zip`) через Vortex → Install From File, а не копированием.
+  (`TGCombatPort-v0.7.2.zip`) через Vortex → Install From File, а не копированием.
 
 ## Установка (для проверки)
 
-1. Скачать `TGCombatPort-v0.7.1.zip` по ссылке выше.
+1. Скачать `TGCombatPort-v0.7.2.zip` по ссылке выше.
 2. Распаковать в папку `Data` игры (cmd):
 
 ```cmd
-tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.7.1.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
+tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.7.2.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
 ```
 
 3. Поставить **Address Library v13** (Nexus, мод 32444, файл для 1.6+) — без него DLL не загрузится.
