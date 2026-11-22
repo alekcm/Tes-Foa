@@ -1,0 +1,8 @@
+1
+5
+Behaviors\Behavior00.hkx
+Characters\BlacksmithSharpeningWheel01_Character.hkx
+CharacterAssets\BlacksmithSharpeningWheelAnimating.HKX
+Animations\blacksmithsharpeningwheelidle.hkx
+Animations\blacksmithsharpeningwheelspin.hkx
+0

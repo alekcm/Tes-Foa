@@ -1,0 +1,8 @@
+1
+5
+Behaviors\Behavior00.hkx
+Characters\Character01.hkx
+CharacterAssets\Skeleton.hkx
+Animations\close.hkx
+Animations\open.hkx
+0

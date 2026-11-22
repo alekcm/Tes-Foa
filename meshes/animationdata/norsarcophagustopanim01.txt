@@ -1,0 +1,9 @@
+1
+6
+Behaviors\SarcophagusBehavior.hkx
+Characters\SarcophagusLid.hkx
+CharacterAssets\SarcophagusSkeleton.hkx
+Animations\sarcophagusidle.hkx
+Animations\sarcophagusopena.hkx
+Animations\sarcophagusopenb.hkx
+0

@@ -1,0 +1,7 @@
+1
+4
+Behaviors\Behavior00.hkx
+Characters\Character00.hkx
+CharacterAssets\TrapBladeSwinging01_Skeleton.hkx
+Animations\trapbladeswinging01_trigger.hkx
+0

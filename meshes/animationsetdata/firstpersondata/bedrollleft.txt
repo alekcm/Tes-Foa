@@ -1,0 +1,7 @@
+V3
+2
+IdleBedRollLeftEnterInstant
+IdleBedRollLeftEnterStart
+0
+0
+0

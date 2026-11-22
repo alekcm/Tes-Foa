@@ -1,0 +1,7 @@
+V3
+2
+IdleSmelterEnter
+IdleSmelterEnterInstant
+0
+0
+0

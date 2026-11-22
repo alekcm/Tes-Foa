@@ -1,0 +1,13 @@
+V3
+2
+weapEquip
+weapForceEquip
+2
+iLeftHandType
+7
+7
+iRightHandType
+7
+7
+0
+0

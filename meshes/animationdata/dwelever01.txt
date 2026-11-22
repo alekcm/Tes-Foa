@@ -1,0 +1,12 @@
+1
+9
+Behaviors\Behavior00.hkx
+Characters\Character00.hkx
+CharacterAssets\Skeleton.hkx
+Animations\fullpulldown.hkx
+Animations\fullpushdown.hkx
+Animations\pulldown.hkx
+Animations\pullup.hkx
+Animations\pushdown.hkx
+Animations\pushup.hkx
+0

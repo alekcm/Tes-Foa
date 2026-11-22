@@ -1,0 +1,6 @@
+1
+3
+Behaviors\Firefly.hkx
+Characters\Firefly.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

@@ -1,0 +1,9 @@
+1
+6
+Behaviors\Behavior00.hkx
+Characters\FireSpitCookingCharacter.hkx
+CharacterAssets\FireSpitCooking.HKX
+Animations\firespitcookingidle.hkx
+Animations\firespitcookingspin.hkx
+Animations\firespitcookingstir.hkx
+0

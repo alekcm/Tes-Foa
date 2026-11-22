@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\PlayAnim\PlayAnimBehavior.hkx
+MagicBehaviors\Characters\PlayAnim\PlayAnimCharacter.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

@@ -1,0 +1,6 @@
+1
+3
+Behaviors\IceWraithEffects\IceWraithEffects.hkx
+Characters\IceWraithEffects\IceWraithEffects.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

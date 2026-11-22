@@ -1,0 +1,7 @@
+V3
+2
+IdleLayDownEnter
+IdleLayDownEnterInstant
+0
+0
+0

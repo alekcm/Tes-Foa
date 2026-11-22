@@ -1,0 +1,6 @@
+1
+3
+EffectsBehaviors\Behaviors\NordicPuzzleDoorFX\NordicPuzzleDoorFXBehavior.hkx
+EffectsBehaviors\Characters\NordicPuzzleDoorFX\NordicPuzzleDoorFXCharacter.hkx
+EffectsBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

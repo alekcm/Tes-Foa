@@ -1,0 +1,10 @@
+1
+7
+Behaviors\MediumWheelBehavior.hkx
+MediumCharacters\MediumWheelCharacter.hkx
+CharacterAssets\MediumWheelSkeleton01.HKX
+Animations\mediumwheel01.hkx
+Animations\mediumwheel02.hkx
+Animations\mediumwheel03.hkx
+Animations\mediumwheeldown.hkx
+0

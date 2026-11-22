@@ -1,0 +1,11 @@
+1
+8
+Behaviors\Behavior00.hkx
+Characters\Character01.hkx
+CharacterAssets\skeleton.hkx
+Animations\seq00.hkx
+Animations\seq01.hkx
+Animations\seq02.hkx
+Animations\seq03.hkx
+Animations\seq04.hkx
+0

@@ -1,0 +1,7 @@
+V3
+2
+IdleSitCrossLeggedEnter
+IdleSitCrossLeggedEnterInstant
+0
+0
+0

@@ -1,0 +1,6 @@
+1
+3
+Behaviors\ExplosionArtAutoPlay\ExplosionArtAutoplay.hkx
+Characters\ExplosionArtAutoPlay\ExplosionArtAutoplay.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

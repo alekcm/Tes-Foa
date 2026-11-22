@@ -1,0 +1,6 @@
+1
+3
+Behaviors\CreatureCastingBehavior.hkx
+Characters\CreatureCastingCharacter.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

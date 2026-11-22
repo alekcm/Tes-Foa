@@ -1,0 +1,7 @@
+1
+4
+Behaviors\BaseDoorBehavior.hkx
+BaseDoorCharacters\BaseDoorCharacter.hkx
+CharacterAssets\DoorBaseSkeleton01.HKX
+Animations\doorbasedown.hkx
+0

@@ -1,0 +1,10 @@
+V3
+2
+IdleLeverPushEnterInstant
+IdleLeverPushStart
+0
+0
+1
+3064642194
+110849190
+7891816

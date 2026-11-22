@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\WardHandBehavior\WardHandFXBehavior.hkx
+MagicBehaviors\Characters\WardHandFXCharacter\WardHandFX.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

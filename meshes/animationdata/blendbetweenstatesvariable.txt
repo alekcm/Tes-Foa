@@ -1,0 +1,6 @@
+1
+3
+Behaviors\Behavior.hkx
+Characters\Character.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

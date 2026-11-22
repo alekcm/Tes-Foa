@@ -1,0 +1,7 @@
+V3
+2
+IdleBlacksmithForgeEnter
+IdleBlacksmithForgeEnterInstant
+0
+0
+0

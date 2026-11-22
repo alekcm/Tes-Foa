@@ -1,0 +1,9 @@
+FullCharacter.txt
+Sphere_1HMCombat.txt
+Sphere_CombatTaunts.txt
+Sphere_Crossbow.txt
+Sphere_Furniture.txt
+Sphere_MTSolo.txt
+Sphere_TurnLeft180.txt
+Sphere_TurnRight180.txt
+Sphere_Warning.txt

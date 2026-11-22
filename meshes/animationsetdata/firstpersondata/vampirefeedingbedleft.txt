@@ -1,0 +1,6 @@
+V3
+1
+VampireFeedingBedLeft
+0
+0
+0

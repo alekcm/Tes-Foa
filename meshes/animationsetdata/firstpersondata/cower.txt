@@ -1,0 +1,7 @@
+V3
+2
+IdleCowerEnter
+IdleCowerEnterInstant
+0
+0
+0

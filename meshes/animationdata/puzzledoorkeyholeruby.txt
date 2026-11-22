@@ -1,0 +1,8 @@
+1
+5
+KeyHoleBehaviors\KeyholeBehavior.hkx
+KeyHoleCharacters\KeyholeCharacter.hkx
+CharacterAssets\KeyHoleSkeleton01.HKX
+KeyholeAnimations\keyhole01.hkx
+KeyholeAnimations\keyholedown.hkx
+0

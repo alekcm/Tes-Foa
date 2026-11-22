@@ -1,0 +1,6 @@
+1
+3
+Behaviors\Moth.hkx
+Characters\Moth.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

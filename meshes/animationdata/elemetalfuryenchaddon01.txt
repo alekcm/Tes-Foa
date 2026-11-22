@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\BeginLoopEndBehavior\BeginLoopEndBehavior.hkx
+MagicBehaviors\Characters\BeginLoopEndChar\BeginLoopEndChar.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

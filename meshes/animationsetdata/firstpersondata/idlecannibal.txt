@@ -1,0 +1,13 @@
+V3
+2
+IdleCannibalFeedCrouching
+IdleCannibalFeedStanding
+0
+0
+2
+596236441
+309838648
+7891816
+596236441
+1492375329
+7891816

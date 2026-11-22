@@ -1,0 +1,6 @@
+1
+3
+Behaviors\waitPlayIdleAwayBehavior.hkx
+Characters\waitPlayIdleAwayCharacter.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

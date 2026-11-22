@@ -1,0 +1,8 @@
+1
+5
+Behaviors\Behavior00.hkx
+Characters\Character00.hkx
+CharacterAssets\LargeTrap_Skeleton.hkx
+Animations\largetrap_trigger01.hkx
+Animations\largetrap_trigger02.hkx
+0

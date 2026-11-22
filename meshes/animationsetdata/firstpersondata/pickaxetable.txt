@@ -1,0 +1,7 @@
+V3
+2
+IdlePickaxeTableEnter
+IdlePickaxeTableEnterInstant
+0
+0
+0

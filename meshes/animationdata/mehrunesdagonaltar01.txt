@@ -1,0 +1,9 @@
+1
+6
+Behaviors\Behavior00.hkx
+Characters\Character01.hkx
+CharacterAssets\skeleton.hkx
+Animations\loop.hkx
+Animations\reforge.hkx
+Animations\take.hkx
+0

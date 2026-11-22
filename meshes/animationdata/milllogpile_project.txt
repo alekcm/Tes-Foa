@@ -1,0 +1,11 @@
+1
+8
+Behaviors\MillLogPile_Behavior.hkx
+Characters\MillLogPile_Character.hkx
+CharacterAssets\MillLogPile_Character.hkx
+Animations\milllogchutecut.hkx
+Animations\milllogchuteidle.hkx
+Animations\milllogcutsabotage.hkx
+Animations\milllogloadstart.hkx
+Animations\milllogpileidle.hkx
+0

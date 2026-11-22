@@ -1,0 +1,9 @@
+V3
+1
+pa_ExtractWerewolfSpirit
+0
+0
+1
+2697173992
+261631
+7891816

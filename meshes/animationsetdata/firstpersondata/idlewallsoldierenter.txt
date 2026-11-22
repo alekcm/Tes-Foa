@@ -1,0 +1,7 @@
+V3
+2
+IdleWallSoldierEnter
+IdleWallSoldierEnterInstant
+0
+0
+0

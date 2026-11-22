@@ -1,0 +1,13 @@
+V3
+2
+IdleWalkThroughWallEnter
+IdleWalkThroughWallEnterInstant
+0
+0
+2
+3729484155
+1039225057
+7891816
+3729484155
+2878487174
+7891816

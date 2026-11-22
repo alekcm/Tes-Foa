@@ -1,0 +1,13 @@
+V3
+2
+IdleReadElderScroll
+IdleReadElderScrollLonger
+0
+0
+2
+596236441
+3528038601
+7891816
+596236441
+2011981122
+7891816

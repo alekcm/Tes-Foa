@@ -1,0 +1,10 @@
+1
+7
+Behaviors\Behavior00.hkx
+Characters\Character01.hkx
+CharacterAssets\Skeleton.hkx
+Animations\down.hkx
+Animations\loop.hkx
+Animations\loopstatic.hkx
+Animations\up.hkx
+0

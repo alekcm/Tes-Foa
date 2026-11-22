@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\DragonMouthFireBehavior\DragonMouthFire.hkx
+MagicBehaviors\Characters\DragonMouthFireCharacter\DragonMouthFire.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

@@ -1,0 +1,8 @@
+1
+5
+Behaviors\Behavior00.hkx
+Characters\Character00.hkx
+CharacterAssets\Skeleton.hkx
+Animations\disable.hkx
+Animations\enable.hkx
+0

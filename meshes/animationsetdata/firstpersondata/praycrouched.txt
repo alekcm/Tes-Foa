@@ -1,0 +1,7 @@
+V3
+2
+IdlePrayCrouchedEnter
+IdlePrayCrouchedEnterInstant
+0
+0
+0

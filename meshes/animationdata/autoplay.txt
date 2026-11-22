@@ -1,0 +1,6 @@
+1
+3
+Behaviors\AutoPlay\AutoplayBehavior.hkx
+Characters\AutoPlay\AutoplayCharacter.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

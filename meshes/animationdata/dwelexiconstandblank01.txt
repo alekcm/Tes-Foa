@@ -1,0 +1,11 @@
+1
+8
+Behaviors\Behavior00.hkx
+Characters\Character01.hkx
+CharacterAssets\Skeleton.hkx
+Animations\close.hkx
+Animations\loop.hkx
+Animations\open.hkx
+Animations\pickup.hkx
+Animations\setdown.hkx
+0

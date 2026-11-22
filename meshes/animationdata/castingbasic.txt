@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\CastingFXBehavior\CastingFXBehavior01.hkx
+MagicBehaviors\Characters\CastingBasicCharacter\CastingBasic.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

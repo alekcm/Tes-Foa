@@ -1,0 +1,6 @@
+1
+3
+Behaviors\SprigganFX01Behavior.hkx
+Characters\SprigganFX01Character.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

@@ -1,0 +1,6 @@
+1
+3
+Behaviors\TrailerFXBehavior.hkx
+Characters\TrailerFXCharacter.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

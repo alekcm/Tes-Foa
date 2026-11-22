@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\CastingRitualBody\CastingRitualBody.hkx
+MagicBehaviors\Characters\CastingRitualBodyCharacter\CastingRitualBody.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

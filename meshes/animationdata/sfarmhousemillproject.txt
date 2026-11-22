@@ -1,0 +1,8 @@
+1
+5
+Behaviors\Behavior00.hkx
+Characters\SFarmhouseMill.hkx
+CharacterAssets\SFarmhouseMillSkel.hkx
+Animations\sfarmhousemillidle.hkx
+Animations\sfarmhousemillpush.hkx
+0

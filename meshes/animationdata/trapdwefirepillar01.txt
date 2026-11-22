@@ -1,0 +1,9 @@
+1
+6
+Behaviors\Behavior00.hkx
+Characters\Character01.hkx
+CharacterAssets\Skeleton.hkx
+Animations\loop01.hkx
+Animations\reset01.hkx
+Animations\trigger01.hkx
+0

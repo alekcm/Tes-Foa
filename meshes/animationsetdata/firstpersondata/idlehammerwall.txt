@@ -1,0 +1,7 @@
+V3
+2
+IdleHammerWallEnter
+IdleHammerWallEnterInstant
+0
+0
+0

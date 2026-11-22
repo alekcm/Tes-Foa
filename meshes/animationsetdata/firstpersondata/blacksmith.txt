@@ -1,0 +1,7 @@
+V3
+2
+IdleBlackSmithEnterInstant
+IdleBlackSmithingEnterStart
+0
+0
+0

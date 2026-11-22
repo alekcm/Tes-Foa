@@ -1,0 +1,8 @@
+1
+5
+Behaviors\Note01Behavior.hkx
+Characters\Note01.hkx
+Character Assets\skeleton.hkx
+Animations\noteclose.hkx
+Animations\noteopen.hkx
+0

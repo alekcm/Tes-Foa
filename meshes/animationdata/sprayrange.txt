@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\SprayRangeBehavior\SprayRangeBehavior.hkx
+MagicBehaviors\Characters\SprayRangeChar\SprayRangeChar.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

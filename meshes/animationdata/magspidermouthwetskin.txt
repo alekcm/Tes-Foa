@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\IdlePlayAnimLoop\IdlePlayAnimLoop.hkx
+MagicBehaviors\Characters\IdlePlayAnimLoop\IdlePlayAnimLoop.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

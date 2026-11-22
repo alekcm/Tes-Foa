@@ -1,0 +1,7 @@
+V3
+2
+IdleTanningEnter
+IdleTanningEnterInstant
+0
+0
+0

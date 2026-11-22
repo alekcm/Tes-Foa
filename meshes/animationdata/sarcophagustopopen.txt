@@ -1,0 +1,6 @@
+1
+3
+Behaviors\SarcophagusTopOpenBehavior.hkx
+Characters\SarcophagusTopOpenCharacter.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

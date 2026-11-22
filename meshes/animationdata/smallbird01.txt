@@ -1,0 +1,6 @@
+1
+3
+CrittersBehaviors\Behaviors\SmallBird01\SmallBirdBehavior.hkx
+CrittersBehaviors\Characters\SmallBird01\SmallBirdCharacter.hkx
+CrittersBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

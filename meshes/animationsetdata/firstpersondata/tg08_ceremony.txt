@@ -1,0 +1,10 @@
+V3
+5
+IdleTG08_Phase1
+IdleTG08_Phase2
+IdleTG08_Phase3
+IdleTG08_Phase4
+IdleTG08_Phase5
+0
+0
+0

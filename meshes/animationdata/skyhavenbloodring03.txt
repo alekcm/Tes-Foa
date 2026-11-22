@@ -1,0 +1,10 @@
+1
+7
+Behaviors\Behavior01.hkx
+Characters\Character01.hkx
+CharacterAssets\Ring01Skeleton.HKX
+Animations\ring01anim01.hkx
+Animations\ring01anim02.hkx
+Animations\ring01anim03.hkx
+Animations\ring01anim04.hkx
+0

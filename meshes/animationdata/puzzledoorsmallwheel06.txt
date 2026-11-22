@@ -1,0 +1,10 @@
+1
+7
+Behaviors\SmallWheelBehavior.hkx
+SmallCharacters\SmallWheelCharacter.hkx
+CharacterAssets\SmallWheelSkeleton01.HKX
+Animations\smallwheel01.hkx
+Animations\smallwheel02.hkx
+Animations\smallwheel03.hkx
+Animations\smallwheeldown.hkx
+0

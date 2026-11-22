@@ -1,0 +1,7 @@
+1
+4
+Behaviors\Behavior00.hkx
+Characters\Character00.hkx
+CharacterAssets\SpikeTrap_Skeleton.hkx
+Animations\spiketrap_trigger01.hkx
+0

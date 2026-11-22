@@ -1,0 +1,14 @@
+BackupResponse : ActorResponse
+idleChairSitting : PlayerChairEnterHandler
+idleBedSleeping : PlayerBedEnterHandler
+idleChairGetUp : PlayerFurnitureExitHandler
+idleBedGetUp : PlayerFurnitureExitHandler
+BowZoomStart : BowZoomStartHandler
+BowZoomStop : BowZoomStopHandler
+StartAnimatedCamera : AnimatedCameraStartHandler
+StartAnimatedCameraDelta : AnimatedCameraDeltaStartHandler
+EndAnimatedCamera : AnimatedCameraEndHandler
+GraphDeleting : AnimatedCameraEndHandler
+PitchOverrideStart : PitchOverrideStartHandler
+PitchOverrideEnd : PitchOverrideEndHandler
+ZeroOutCameraPitch : ZeroPitchHandler

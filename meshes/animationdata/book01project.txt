@@ -1,0 +1,10 @@
+1
+7
+Behaviors\Book01Behavior.hkx
+Characters\Book01Character.hkx
+Character Assets\skeleton.hkx
+Animations\bookclose.hkx
+Animations\bookopen.hkx
+Animations\bookpageb.hkx
+Animations\bookpagef.hkx
+0

@@ -1,0 +1,6 @@
+1
+3
+Behaviors\IdleTransIdleBack\IdleTransIdleBackBehavior.hkx
+Characters\IdleTransIdleBack\IdleTransIdleBackCharacter.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

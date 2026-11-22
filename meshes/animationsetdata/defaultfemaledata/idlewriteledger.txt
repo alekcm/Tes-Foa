@@ -1,0 +1,14 @@
+V3
+3
+IdleWriteLedgerChargenEnter
+IdleWriteLedgerEnter
+IdleWriteLedgerWrite
+0
+0
+2
+3064642194
+73940496
+7891816
+3064642194
+3755683286
+7891816

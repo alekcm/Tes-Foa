@@ -1,0 +1,14 @@
+1
+11
+Behaviors\Behavior00.hkx
+Characters\Character01.hkx
+CharacterAssets\skeleton.hkx
+Animations\fire.hkx
+Animations\firebolt01.hkx
+Animations\firebolt02.hkx
+Animations\firebolt03.hkx
+Animations\reload.hkx
+Animations\reload01.hkx
+Animations\reload02.hkx
+Animations\reload03.hkx
+0

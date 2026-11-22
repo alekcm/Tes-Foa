@@ -1,0 +1,10 @@
+1
+7
+Behaviors\BowBehavior.hkx
+Characters\BowCharacter.hkx
+Character Assets\skeleton.HKX
+Animations\bow_drawheavy.hkx
+Animations\bow_drawlight.hkx
+Animations\bow_idledrawn.hkx
+Animations\bow_release.hkx
+0

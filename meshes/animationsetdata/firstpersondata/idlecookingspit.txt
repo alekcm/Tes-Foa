@@ -1,0 +1,7 @@
+V3
+2
+IdleCookingSpitEnter
+IdleCookingSpitEnterInstant
+0
+0
+0

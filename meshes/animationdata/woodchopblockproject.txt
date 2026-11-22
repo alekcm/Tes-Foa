@@ -1,0 +1,8 @@
+1
+5
+Behaviors\WoodChoppingBlockBehavior.hkx
+Characters\WoodChoppingBlockCharacter.hkx
+CharacterAssets\WoodChoppingBlock.hkx
+Animations\furnanimobjectchopidle.hkx
+Animations\furnanimobjectchoploop.hkx
+0

@@ -1,0 +1,12 @@
+1
+9
+Behaviors\Behavior00.hkx
+Characters\Character00.hkx
+CharacterAssets\NorLever01_Skeleton.hkx
+Animations\norlever01_fullpulldown.hkx
+Animations\norlever01_fullpushdown.hkx
+Animations\norlever01_pulldown.hkx
+Animations\norlever01_pullup.hkx
+Animations\norlever01_pushdown.hkx
+Animations\norlever01_pushup.hkx
+0

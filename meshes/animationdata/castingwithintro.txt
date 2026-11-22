@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\CastingWIntroFXBehavior\CastingWIntroFXBehavior01.hkx
+MagicBehaviors\Characters\HandWIntroEffects\HandWIntroEffects.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

@@ -1,0 +1,9 @@
+1
+6
+Behaviors\Behavior00.hkx
+Characters\Character00.hkx
+CharacterAssets\RuinsPillarSkeleton01.HKX
+Animations\ruinspillartrigger01.hkx
+Animations\ruinspillartrigger02.hkx
+Animations\ruinspillartrigger03.hkx
+0

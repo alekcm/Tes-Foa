@@ -1,0 +1,7 @@
+1
+4
+Behaviors\Behavior00.hkx
+Characters\Character00.hkx
+CharacterAssets\SarcophagusTopVert01_Skeleton.hkx
+Animations\sarcophagustopvert01_trigger01.hkx
+0

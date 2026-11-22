@@ -1,0 +1,10 @@
+1
+7
+Behaviors\LargeWheelBehavior.hkx
+LargeCharacters\LargeWheelCharacter.hkx
+CharacterAssets\LargeWheelSkeleton01.HKX
+Animations\largewheel01.hkx
+Animations\largewheel02.hkx
+Animations\largewheel03.hkx
+Animations\largewheeldown.hkx
+0

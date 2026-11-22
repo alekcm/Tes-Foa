@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\Projectile01Behavior.hkx
+MagicBehaviors\Characters\FireballProjectile01Character\FireballProjectile01Character.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

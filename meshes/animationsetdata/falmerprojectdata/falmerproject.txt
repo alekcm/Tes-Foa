@@ -1,0 +1,12 @@
+1HM_Magic.txt
+1HM_Shield.txt
+1HM_Solo.txt
+BaseSet.txt
+BowSet.txt
+H2H_Set.txt
+H2HMagic.txt
+IdleAggroWarning.txt
+IdleDetection.txt
+IdlePod.txt
+IdleScratch.txt
+IdleSquat.txt

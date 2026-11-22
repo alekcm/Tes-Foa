@@ -1,0 +1,16 @@
+1
+13
+Behaviors\Behavior00.hkx
+Characters\Character01.hkx
+CharacterAssets\Skeleton.hkx
+Animations\180back.hkx
+Animations\180for.hkx
+Animations\180half.hkx
+Animations\270back.hkx
+Animations\270for.hkx
+Animations\270half.hkx
+Animations\90back.hkx
+Animations\90for.hkx
+Animations\90half.hkx
+Animations\stopgap.hkx
+0

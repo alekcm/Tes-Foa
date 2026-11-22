@@ -1,0 +1,9 @@
+1
+6
+Behaviors\RotatingDoorBehavior.hkx
+Characters\NorRotatingDoor01Character.hkx
+CharacterAssets\NorRotatingDoor01_Skeleton.hkx
+Animations\close.hkx
+Animations\norrotatingdoor01_rotate.hkx
+Animations\open.hkx
+0

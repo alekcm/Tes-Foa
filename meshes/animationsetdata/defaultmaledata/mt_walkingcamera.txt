@@ -1,0 +1,9 @@
+V3
+1
+IdleWalkingCameraStart
+0
+0
+1
+3064642194
+996349442
+7891816

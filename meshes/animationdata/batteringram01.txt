@@ -1,0 +1,8 @@
+1
+5
+Behaviors\Behavior00.hkx
+Characters\Character00.hkx
+CharacterAssets\BatteringRam01_Skeleton.hkx
+Animations\batteringram01_single.hkx
+Animations\batteringram01_trigger.hkx
+0

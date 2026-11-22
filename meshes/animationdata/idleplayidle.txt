@@ -1,0 +1,6 @@
+1
+3
+Behaviors\IdlePlayIdle\IdlePlayIdleBehavior.hkx
+Characters\IdlePlayIdle\IdlePlayIdleCharacter.hkx
+CharacterAssets\SingleBoneSkeleton.hkx
+0

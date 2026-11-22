@@ -1,0 +1,10 @@
+V3
+2
+IdleWoodPickUpEnter
+IdleWoodPickUpEnterInstant
+0
+0
+1
+3064642194
+1643827378
+7891816

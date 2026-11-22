@@ -1,0 +1,6 @@
+1
+3
+PowerWordsBehaviors\Behaviors\Tiid\TiidBehavior.hkx
+PowerWordsBehaviors\Characters\Tiid\TiidCharacter.hkx
+PowerWordsBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0

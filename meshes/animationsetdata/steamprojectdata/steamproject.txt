@@ -1,0 +1,7 @@
+Centurion_Combat.txt
+Centurion_Furniture.txt
+Centurion_Idles.txt
+Centurion_IdlesCombat.txt
+Centurion_MTSolo.txt
+Centurion_TurnLeft180.txt
+Centurion_TurnRight180.txt

@@ -1,0 +1,6 @@
+1
+3
+MagicBehaviors\Behaviors\IdleOnLoadBehavior\IdleOnLoadBehavior.hkx
+MagicBehaviors\Characters\IdleOnLoadChar\IdleOnLoadChar.hkx
+MagicBehaviors\CharacterAssets\SingleBoneSkeleton.hkx
+0
