@@ -32,15 +32,22 @@ IsEquippedRightType(1) OR IsEquippedRightType(2)
 
 ## Установка (cmd, Windows)
 
-Архив `TGCombatPort-vX.Y.Z.zip` уже содержит нужную папку, поэтому установка — та же команда, что и
-раньше, плюс проверка:
+Архив `TGCombatPort-vX.Y.Z.zip` содержит папку `meshes` наравне с DLL, то есть анимация ставится
+той же командой, что и сам плагин. Порядок: сначала проверить архив, потом распаковать.
 
 ```cmd
-tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.12.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
+tar -tf "%USERPROFILE%\Downloads\TGCombatPort-v0.13.0.zip" | findstr /i "DynamicAnimationReplacer"
+```
+
+В списке должны быть **четыре** строки (два клипа и два файла условий: третье лицо и вид от первого
+лица). Если строк нет — архив не тот, писать мне, а не распаковывать.
+
+```cmd
+tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.13.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
 dir /s /b "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data\meshes\actors\character\animations\DynamicAnimationReplacer\_CustomConditions\90001"
 ```
 
-Во второй команде должно быть два файла: `1hm_attackpowerfwd.hkx` и `_conditions.txt`.
+Во второй команде должно быть два файла: `1hm_attackpowerfwd.hkx` (17 904 байта) и `_conditions.txt`.
 
 Если DAR ещё не стоит: скачать с Nexus, поставить как обычный мод (файл `DynamicAnimationReplacer.dll`
 в `Data\SKSE\Plugins\`), перезапустить игру.
@@ -68,6 +75,31 @@ rmdir /s /q "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data\meshes
 ```
 
 Механика укола (`chip`) останется, вернётся только ванильная анимация силовой атаки.
+
+## Почему анимация может не появиться, хотя файлы на месте
+
+Три причины, все проверяются за минуту:
+
+| Причина | Как проверить | Что делать |
+|---|---|---|
+| не установлен Dynamic Animation Replacer | в игре нет `Data\SKSE\Plugins\DynamicAnimationReplacer.dll` | поставить DAR (Nexus, SKSE-плагин), перезапустить игру |
+| старый архив (до 0.13.0) | команда `tar -tf` по архиву не печатает папку `meshes` | скачать 0.13.0 и новее |
+| удар не силовой | в логе плагина нет строки `hit: ... power=true` | зажать атаку, а не нажимать |
+
+Важно: **правило укола (`chip`) работает и без анимации** — урон сквозь блок проходит, меняется
+только внешний вид удара. То есть эти две вещи независимы, и «анимации нет» не значит «механики нет».
+
+## Гарантия сборки (чтобы это не повторилось)
+
+В `.github/workflows/native.yml` шаг упаковки теперь:
+
+1. до упаковки падает, если исходных клипов нет в `native/assets/anim/meshes`;
+2. после упаковки читает готовый zip и падает, если в нём нет хотя бы одного из четырёх файлов
+   (`анимация укола не попала в версию`);
+3. печатает в лог полный список файлов архива — его видно в интерфейсе Actions.
+
+Плюс тест `tests/test_tools.py::ThrustAnimationAssetsTests` проверяет клипы и условия в репозитории
+(размер, Havok-подпись `57 E0 E0 57`, наличие `IsEquippedRightType(1)` и `(2)`).
 
 ## Что осталось честно неизвестным
 

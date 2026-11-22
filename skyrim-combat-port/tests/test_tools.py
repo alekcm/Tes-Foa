@@ -809,3 +809,33 @@ class EspDumpTests(unittest.TestCase):
             with self.assertRaises(ValueError) as caught:
                 esp_dump.parse_plugin(path)
         self.assertIn("не удалось разобрать", str(caught.exception))
+
+class ThrustAnimationAssetsTests(unittest.TestCase):
+    """Анимация укола — часть поставки: клипы и условия должны лежать в native/assets/anim."""
+
+    ANIM = ROOT / "native" / "assets" / "anim" / "meshes" / "actors" / "character"
+    CLIPS = (
+        ANIM / "animations" / "DynamicAnimationReplacer" / "_CustomConditions" / "90001",
+        ANIM / "_1stperson" / "animations" / "DynamicAnimationReplacer" / "_CustomConditions" / "90001",
+    )
+
+    def test_clips_and_conditions_exist(self) -> None:
+        for folder in self.CLIPS:
+            clip = folder / "1hm_attackpowerfwd.hkx"
+            self.assertTrue(clip.is_file(), f"нет клипа {clip}")
+            self.assertGreater(clip.stat().st_size, 5000, f"клип {clip} подозрительно мал")
+            self.assertEqual(clip.read_bytes()[:4].hex(), "57e0e057", "это не Havok-клип")
+
+            conditions = folder / "_conditions.txt"
+            self.assertTrue(conditions.is_file(), f"нет условий {conditions}")
+            text = conditions.read_text(encoding="utf-8")
+            self.assertIn("IsEquippedRightType(1)", text)
+            self.assertIn("IsEquippedRightType(2)", text)
+
+    def test_ci_packages_the_animation(self) -> None:
+        path = ROOT.parent / ".github" / "workflows" / "native.yml"
+        if not path.is_file():
+            self.skipTest(f"нет файла {path} (запуск вне репозитория)")
+        workflow = path.read_text(encoding="utf-8")
+        self.assertIn("Copy-Item -Recurse $animSource pkg/", workflow)
+        self.assertIn("анимация укола не попала в версию", workflow)
