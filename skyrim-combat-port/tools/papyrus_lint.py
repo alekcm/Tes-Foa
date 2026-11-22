@@ -30,7 +30,8 @@ OPENERS = {
     "Group": "EndGroup",
 }
 CLOSERS = {closer: opener for opener, closer in OPENERS.items()}
-SCRIPT_NAME = re.compile(r"^\s*ScriptName\s+(\w+)(?:\s+extends\s+(\w+))?\s*$", re.IGNORECASE)
+# ScriptName Foo extends Bar  либо  ScriptName Foo Hidden (флаг после имени).
+SCRIPT_NAME = re.compile(r"^\s*ScriptName\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+(\w+))?\s*$", re.IGNORECASE)
 WORD = re.compile(r"^\s*(\w+)")
 
 
@@ -50,6 +51,7 @@ def lint_file(path: Path) -> tuple[list[str], list[str]]:
     stack: list[tuple[str, int]] = []
     script_name: str | None = None
     extends: str | None = None
+    hidden: bool = False
 
     for number, raw in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
         if "\t" in raw:
@@ -62,6 +64,7 @@ def lint_file(path: Path) -> tuple[list[str], list[str]]:
         if match:
             script_name = match.group(1)
             extends = match.group(2)
+            hidden = (match.group(3) or "").lower() == "hidden"
             continue
 
         word_match = WORD.match(line)
@@ -75,6 +78,10 @@ def lint_file(path: Path) -> tuple[list[str], list[str]]:
             word = "Function"
 
         if word in OPENERS:
+            # "Bool Function IsBlocking(Actor akActor) Global Native" — объявление без тела:
+            # закрывающего EndFunction у него не бывает.
+            if word == "Function" and "Native" in tokens:
+                continue
             stack.append((word, number))
         elif word in CLOSERS:
             expected_opener = CLOSERS[word]
@@ -95,7 +102,8 @@ def lint_file(path: Path) -> tuple[list[str], list[str]]:
     else:
         if script_name != path.stem:
             errors.append(f"{path.name}: ScriptName {script_name} не совпадает с именем файла")
-        if extends is None:
+        # Hidden-скрипты (набор native-объявлений) не наследуют ReferenceAlias и т.п.
+        if extends is None and not hidden:
             warnings.append(f"{path.name}: ScriptName без extends")
 
     return errors, warnings

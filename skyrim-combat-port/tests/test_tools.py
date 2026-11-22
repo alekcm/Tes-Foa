@@ -373,6 +373,28 @@ class PapyrusLintTests(unittest.TestCase):
         errors, _ = self.lint("Tabs.psc", "ScriptName Tabs extends Quest\n\tEvent OnInit()\n\tEndEvent\n")
         self.assertTrue(any("таб" in error for error in errors))
 
+    def test_native_function_declaration_needs_no_endfunction(self) -> None:
+        errors, warnings = self.lint(
+            "NativeApi.psc",
+            "ScriptName NativeApi Hidden\n\n"
+            "Bool Function IsBlocking(Actor akActor) Global Native\n"
+            "Function Tick() Global Native\n",
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(warnings, [])
+
+    def test_script_name_with_extended_flag_is_accepted(self) -> None:
+        errors, warnings = self.lint(
+            "Flagged.psc",
+            "ScriptName Flagged Hidden\n\nFunction DoIt() Global Native\n",
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(warnings, [])
+
+    def test_script_without_extends_still_warns(self) -> None:
+        _, warnings = self.lint("NoExtends.psc", "ScriptName NoExtends\n\nEvent OnInit()\nEndEvent\n")
+        self.assertTrue(any("без extends" in warning for warning in warnings))
+
     def test_project_scripts_are_clean(self) -> None:
         errors, _ = papyrus_lint.lint_paths([ROOT / "src" / "papyrus"])
         self.assertEqual(errors, [])

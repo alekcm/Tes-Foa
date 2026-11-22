@@ -11,10 +11,10 @@
 ; «игрок сейчас блокирует», который может читать любой другой скрипт мода, не подписываясь
 ; на события повторно.
 ;
-; Чего здесь НЕТ и почему: ответного действия бандита («щитовой финт → баш»). Ванильная
-; Debug.SendAnimationEvent для этого не годится — пользователь выбрал реализацию через SKSE
-; (см. native/README.md: плагин TGCombatPort.dll). Приказ NPC на действие будет отдаваться из
-; DLL, а этот скрипт останется только источником признака «игрок блокирует».
+; Ответное действие бандита («щитовой финт → баш») делает SKSE-плагин TGCombatPort.dll.
+; Пока игрок держит блок, скрипт каждые 0.25 с зовёт TGCP_Native.Tick(): плагин поднимает
+; бандитам со щитом множитель bash в их CombatStyle на 1,5 с, с кулдауном 7 с.
+; Скрипт — только «часы» и признак блока; вся логика в DLL (см. native/README.md).
 
 ;
 ; Настройка в CK:
@@ -30,7 +30,12 @@
 
 ScriptName TGCP_PlayerBlockWatcher extends ReferenceAlias
 
+Import TGCP_Native
+
 GlobalVariable Property PlayerBlocking Auto
+
+; Как часто звать TGCP_Native.Tick(), пока игрок держит блок.
+Float TickInterval = 0.25
 
 Bool Registered
 
@@ -72,8 +77,21 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
     If asEventName == "blockStart" || asEventName == "blockStartOut"
         PlayerBlocking.SetValue(1.0)
         Debug.Trace("[TGCP] player block start (" + asEventName + ")")
+        RegisterForSingleUpdate(TickInterval)
     ElseIf asEventName == "blockStop"
         PlayerBlocking.SetValue(0.0)
         Debug.Trace("[TGCP] player block stop (" + asEventName + ")")
+    EndIf
+EndEvent
+
+; Пока игрок блокирует — крутим Tick. Как только блок снят, делаем ещё один Tick,
+; чтобы плагин закрыл открытые окна, и останавливаемся.
+Event OnUpdate()
+    Actor player = GetActorReference()
+    If player != None && TGCP_Native.IsBlocking(player)
+        TGCP_Native.Tick()
+        RegisterForSingleUpdate(TickInterval)
+    Else
+        TGCP_Native.Tick()
     EndIf
 EndEvent

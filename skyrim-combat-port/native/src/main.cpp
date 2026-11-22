@@ -1,57 +1,64 @@
 // TGCombatPort — SKSE-плагин (DLL).
 //
-// Задача: реализовать механику бандита со щитом нативно, без анимационных хаков.
+// Механика бандита со щитом: «bash только против блока».
 //
-// Что делает:
-//   1. Точное состояние блока актёра: TGCP_Native.IsBlocking(Actor) — читает
-//      RE::Actor::IsBlocking() (то же состояние, что видит движок), а не события анимации.
-//   2. Управляет решением AI о блокирующем ударе (shield bash). В движке выбор атаки идёт
-//      через Actor::GetAttackChance(target, attackData); плагин перехватывает эту функцию
-//      и поднимает шанс bash-атаки, когда игрок держит блок, бандит со щитом в бою с игроком
-//      и дистанция ближнего боя. Анимацию и попадание при этом считает сама игра —
-//      состояние анимации не ломается.
-//   3. Кулдаун 7 с на актёра (по дизайну: «bash cooldown 7 s»).
-//   4. Пишет диагностику в Documents\My Games\Skyrim Special Edition\SKSE\TGCombatPort.log.
+// Важно: в этой версии НЕТ перехвата функций игры (hook). Прошлая версия 0.1.1
+// патчила Actor::GetAttackChance и вызывала вылет; такой способ убран полностью.
 //
-// Значения (boost, радиус, кулдаун) собраны в начале файла — их правят по результатам теста.
+// Как работает теперь:
+//   1. Скрипт TGCP_PlayerBlockWatcher, пока игрок держит блок, каждые 0.25 с зовёт
+//      TGCP_Native.Tick().
+//   2. Tick() ищет бандитов со щитом, которые враждебны игроку и стоят в ближнем бою,
+//      и на 1,5 с поднимает в их CombatStyle значение bashMult (множитель «бить щитом»).
+//      Это ровно те числа, которые AI использует при выборе атаки, — сам бой, урон,
+//      блок и анимации остаются ванильными.
+//   3. Через 1,5 с исходное значение возвращается. Повторно для того же бандита —
+//      не раньше 7 с (кулдаун из дизайна).
+//   4. Всё пишется в Documents\My Games\Skyrim Special Edition\SKSE\TGCombatPort.log.
+//
+// Побочный эффект, о котором надо знать: CombatStyle — общая запись, поэтому
+// подъём действует на всех, кто этот стиль использует, но только 1,5 с и только
+// пока игрок блокирует.
 
 #include "pch.h"
 
 #include <algorithm>
-#include <atomic>
 #include <chrono>
-#include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace
 {
 	using namespace std::literals;
+	using Clock = std::chrono::steady_clock;
 
 	// --- параметры механики (из docs/skyrim_enemy_combat_design_spec.md) ---
-	constexpr float kBashBoostChance = 10.0f;     // во сколько «весит» bash, пока игрок блокирует
 	constexpr float kMeleeRadius = 240.0f;        // ближняя дистанция, игровые единицы
+	constexpr float kBashMultBoost = 10.0f;       // во что превращается bashMult на время окна
+	constexpr float kBashWindowSeconds = 1.5f;    // сколько держится окно
 	constexpr float kBashCooldownSeconds = 7.0f;  // «bash cooldown 7 s»
-	constexpr std::uint64_t kStatsEveryCalls = 4000;
 
 	std::atomic_bool g_enabled{ true };
-	std::atomic<std::uint64_t> g_calls{ 0 };
-	std::atomic<std::uint64_t> g_bashCandidates{ 0 };
-	std::atomic<std::uint64_t> g_blockingShieldCalls{ 0 };
-	std::atomic<std::uint64_t> g_boosts{ 0 };
-	std::atomic<std::uint64_t> g_bashSeenLogged{ 0 };
-	std::atomic<std::uint64_t> g_evalWhileBlocking{ 0 };   // AI оценивал любую атаку, пока игрок блокирует
-	std::atomic<std::uint64_t> g_rejectLogged{ 0 };
-	std::atomic<std::uint64_t> g_nonBashLogged{ 0 };
+	std::atomic<std::uint64_t> g_ticks{ 0 };
+	std::atomic<std::uint64_t> g_windows{ 0 };
+	std::atomic<std::uint64_t> g_candidates{ 0 };
+	std::atomic<std::uint64_t> g_closeLogged{ 0 };
 
-	std::mutex g_cooldownLock;
-	std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> g_lastBoost;
+	struct Window
+	{
+		RE::TESCombatStyle* style;
+		float               oldBashMult;
+		Clock::time_point   until;
+		RE::FormID          actor;
+	};
+
+	std::vector<Window> g_openWindows;
+	std::unordered_map<RE::FormID, Clock::time_point> g_lastWindow;
+	std::unordered_map<RE::FormID, std::uint64_t> g_rejectLogged;
 
 	bool HasShield(RE::Actor* a_actor)
 	{
-		if (!a_actor) {
-			return false;
-		}
 		for (const bool leftHand : { false, true }) {
 			const auto* equipped = a_actor->GetEquippedObject(leftHand);
 			if (!equipped) {
@@ -65,116 +72,129 @@ namespace
 		return false;
 	}
 
-	// --- перехват Actor::GetAttackChance(Actor* target, BGSAttackData*) ---
-	using GetAttackChance_t = float (*)(RE::Actor*, RE::Actor*, RE::BGSAttackData*);
-	REL::Relocation<GetAttackChance_t> g_getAttackChance;
-
-	float GetAttackChanceHook(RE::Actor* a_self, RE::Actor* a_target, RE::BGSAttackData* a_attackData)
+	RE::TESCombatStyle* GetCombatStyle(RE::Actor* a_actor)
 	{
-		const float original = g_getAttackChance(a_self, a_target, a_attackData);
-		const auto callIndex = g_calls.fetch_add(1, std::memory_order_relaxed) + 1;
-
-		if (callIndex % kStatsEveryCalls == 0) {
-			logs::info("hook stats: calls={} whileBlocking={} shieldCalls={} bash={} boosts={} enabled={}",
-				callIndex,
-				g_evalWhileBlocking.load(std::memory_order_relaxed),
-				g_blockingShieldCalls.load(std::memory_order_relaxed),
-				g_bashCandidates.load(std::memory_order_relaxed),
-				g_boosts.load(std::memory_order_relaxed),
-				g_enabled.load(std::memory_order_relaxed));
-		}
-
-		if (!g_enabled.load(std::memory_order_relaxed) || !a_self || !a_attackData) {
-			return original;
-		}
-
-		const auto* player = RE::PlayerCharacter::GetSingleton();
-		if (!player || a_self == player) {
-			return original;
-		}
-
-		const bool playerBlocking = player->IsBlocking();
-		if (!playerBlocking) {
-			return original;
-		}
-
-		g_evalWhileBlocking.fetch_add(1, std::memory_order_relaxed);
-
-		const float distance = a_self->GetPosition().GetDistance(player->GetPosition());
-		const bool inCombat = a_self->IsInCombat();
-		const bool hostile = inCombat && a_self->IsHostileToActor(const_cast<RE::PlayerCharacter*>(player));
-		const bool shield = hostile && HasShield(a_self);
-		const bool inRange = shield && distance <= kMeleeRadius;
-
-		if (!inRange) {
-			if (g_rejectLogged.fetch_add(1, std::memory_order_relaxed) < 10) {
-				logs::info("skip: actor={} inCombat={} hostile={} shield={} dist={:.0f}",
-					a_self->GetName(),
-					inCombat,
-					hostile,
-					shield,
-					distance);
-			}
-			return original;
-		}
-
-		g_blockingShieldCalls.fetch_add(1, std::memory_order_relaxed);
-
-		const bool isBash = a_attackData->data.flags.any(RE::AttackData::AttackFlag::kBashAttack);
-		if (!isBash) {
-			if (g_nonBashLogged.fetch_add(1, std::memory_order_relaxed) < 8) {
-				logs::info("eval while blocking (not bash): actor={} event={} chance={:.2f} dist={:.0f}",
-					a_self->GetName(),
-					a_attackData->event.c_str(),
-					original,
-					distance);
-			}
-			return original;
-		}
-
-		if (g_bashSeenLogged.fetch_add(1, std::memory_order_relaxed) < 10) {
-			logs::info("bash candidate: actor={} chance={:.2f} dist={:.0f}", a_self->GetName(), original, distance);
-		}
-
-		g_bashCandidates.fetch_add(1, std::memory_order_relaxed);
-
-		{
-			std::lock_guard lock(g_cooldownLock);
-			const auto now = std::chrono::steady_clock::now();
-			auto& last = g_lastBoost[a_self->GetFormID()];
-			if (last.time_since_epoch().count() != 0) {
-				const auto elapsed = std::chrono::duration<float>(now - last).count();
-				if (elapsed < kBashCooldownSeconds) {
-					return original;
-				}
-			}
-			last = now;
-		}
-
-		g_boosts.fetch_add(1, std::memory_order_relaxed);
-		logs::info("bash boost: actor={} chance {:.2f} -> {:.2f} dist={:.0f}",
-			a_self->GetName(),
-			original,
-			kBashBoostChance,
-			distance);
-
-		return (std::max)(original, kBashBoostChance);
+		const auto* base = a_actor->GetActorBase();
+		return base ? base->GetCombatStyle() : nullptr;
 	}
 
-	void InstallHook()
+	bool HasOpenWindow(RE::FormID a_actor)
 	{
-		auto& trampoline = SKSE::GetTrampoline();
+		return std::any_of(g_openWindows.begin(), g_openWindows.end(),
+			[a_actor](const Window& w) { return w.actor == a_actor; });
+	}
 
-		REL::Relocation<std::uintptr_t> target{ RELOCATION_ID(49748, 50675) };  // Actor::GetAttackChance
-		g_getAttackChance = trampoline.write_branch<5>(target.address(), reinterpret_cast<std::uintptr_t>(&GetAttackChanceHook));
+	void CloseExpiredWindows(Clock::time_point a_now)
+	{
+		for (auto it = g_openWindows.begin(); it != g_openWindows.end();) {
+			if (a_now < it->until) {
+				++it;
+				continue;
+			}
+			it->style->meleeData.bashMult = it->oldBashMult;
+			if (g_closeLogged.fetch_add(1, std::memory_order_relaxed) < 20) {
+				logs::info("bash window closed: style={:08X} bashMult -> {:.2f}",
+					it->style->GetFormID(),
+					it->oldBashMult);
+			}
+			it = g_openWindows.erase(it);
+		}
+	}
 
-		logs::info("hook installed: Actor::GetAttackChance at {:#x}", target.address());
+	void ConsiderActor(RE::Actor* a_actor, const RE::PlayerCharacter* a_player, Clock::time_point a_now)
+	{
+		if (!a_actor || a_actor == a_player) {
+			return;
+		}
+		if (!a_actor->IsInCombat() || !a_actor->IsHostileToActor(const_cast<RE::PlayerCharacter*>(a_player))) {
+			return;
+		}
+		if (!HasShield(a_actor)) {
+			return;
+		}
+
+		const float distance = a_actor->GetPosition().GetDistance(a_player->GetPosition());
+		if (distance > kMeleeRadius) {
+			return;
+		}
+
+		g_candidates.fetch_add(1, std::memory_order_relaxed);
+
+		const auto actorID = a_actor->GetFormID();
+		if (HasOpenWindow(actorID)) {
+			return;
+		}
+
+		const auto last = g_lastWindow.find(actorID);
+		if (last != g_lastWindow.end()) {
+			const auto elapsed = std::chrono::duration<float>(a_now - last->second).count();
+			if (elapsed < kBashCooldownSeconds) {
+				return;
+			}
+		}
+
+		auto* style = GetCombatStyle(a_actor);
+		if (!style) {
+			if (g_rejectLogged[actorID]++ < 3) {
+				logs::info("skip: actor={} без CombatStyle", a_actor->GetName());
+			}
+			return;
+		}
+
+		// Не трогаем стиль, если окно для него уже открыто другим бандитом.
+		const bool styleBusy = std::any_of(g_openWindows.begin(), g_openWindows.end(),
+			[style](const Window& w) { return w.style == style; });
+		if (styleBusy) {
+			return;
+		}
+
+		Window window{ style, style->meleeData.bashMult, a_now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kBashWindowSeconds)), actorID };
+		style->meleeData.bashMult = kBashMultBoost;
+		g_openWindows.push_back(window);
+		g_lastWindow[actorID] = a_now;
+		g_windows.fetch_add(1, std::memory_order_relaxed);
+
+		logs::info("bash window opened: actor={} style={:08X} bashMult {:.2f} -> {:.2f} dist={:.0f}",
+			a_actor->GetName(),
+			style->GetFormID(),
+			window.oldBashMult,
+			kBashMultBoost,
+			distance);
 	}
 
 	// --- Papyrus API (скрипт TGCP_Native) ---
 	bool PapyrusIsBlocking(RE::StaticFunctionTag*, RE::Actor* a_actor)
 	{
 		return a_actor ? a_actor->IsBlocking() : false;
+	}
+
+	// Вызывается из Papyrus, пока игрок держит блок.
+	void PapyrusTick(RE::StaticFunctionTag*)
+	{
+		g_ticks.fetch_add(1, std::memory_order_relaxed);
+
+		const auto now = Clock::now();
+		CloseExpiredWindows(now);
+
+		if (!g_enabled.load(std::memory_order_relaxed)) {
+			return;
+		}
+
+		const auto* player = RE::PlayerCharacter::GetSingleton();
+		if (!player || !player->IsBlocking()) {
+			return;
+		}
+
+		const auto* processLists = RE::ProcessLists::GetSingleton();
+		if (!processLists) {
+			return;
+		}
+
+		for (const auto* handles : { &processLists->highActorHandles, &processLists->middleHighActorHandles }) {
+			for (const auto& handle : *handles) {
+				ConsiderActor(handle.get().get(), player, now);
+			}
+		}
 	}
 
 	void PapyrusSetEnabled(RE::StaticFunctionTag*, bool a_enabled)
@@ -185,29 +205,31 @@ namespace
 
 	std::string PapyrusGetStats(RE::StaticFunctionTag*)
 	{
-		return std::format("calls={} bash={} boosts={} enabled={}",
-			g_calls.load(std::memory_order_relaxed),
-			g_bashCandidates.load(std::memory_order_relaxed),
-			g_boosts.load(std::memory_order_relaxed),
+		return std::format("ticks={} candidates={} windows={} open={} enabled={}",
+			g_ticks.load(std::memory_order_relaxed),
+			g_candidates.load(std::memory_order_relaxed),
+			g_windows.load(std::memory_order_relaxed),
+			g_openWindows.size(),
 			g_enabled.load(std::memory_order_relaxed));
 	}
 
 	bool RegisterPapyrusFunctions(RE::BSScript::IVirtualMachine* a_vm)
 	{
 		a_vm->RegisterFunction("IsBlocking"sv, "TGCP_Native"sv, PapyrusIsBlocking, false);
+		a_vm->RegisterFunction("Tick"sv, "TGCP_Native"sv, PapyrusTick, false);
 		a_vm->RegisterFunction("SetEnabled"sv, "TGCP_Native"sv, PapyrusSetEnabled, false);
 		a_vm->RegisterFunction("GetStats"sv, "TGCP_Native"sv, PapyrusGetStats, false);
-		logs::info("Papyrus functions registered: TGCP_Native.IsBlocking / SetEnabled / GetStats"sv);
+		logs::info("Papyrus functions registered: TGCP_Native IsBlocking / Tick / SetEnabled / GetStats"sv);
 		return true;
 	}
 }
 
 SKSE_PLUGIN_LOAD(const SKSE::LoadInterface* a_skse)
 {
-	SKSE::Init(a_skse, { .trampoline = true, .trampolineSize = 128 });
+	SKSE::Init(a_skse);
 
 	const auto version = a_skse->RuntimeVersion();
-	logs::info("TGCombatPort native loaded, runtime {}.{}.{}.{}"sv,
+	logs::info("TGCombatPort native loaded, runtime {}.{}.{}.{} (без хуков)"sv,
 		version.major(),
 		version.minor(),
 		version.patch(),
@@ -217,14 +239,6 @@ SKSE_PLUGIN_LOAD(const SKSE::LoadInterface* a_skse)
 		papyrus->Register(RegisterPapyrusFunctions);
 	} else {
 		logs::error("Papyrus interface недоступен"sv);
-	}
-
-	try {
-		InstallHook();
-	} catch (const std::exception& e) {
-		logs::error("hook failed: {}", e.what());
-	} catch (...) {
-		logs::error("hook failed: unknown error");
 	}
 
 	return true;
