@@ -68,9 +68,12 @@ jobs:
       - name: Package for install
         shell: pwsh
         run: |
+          $name = "TGCombatPort-" + ($env:GITHUB_REF_NAME -replace '[/\\]', '-') + ".zip"
           New-Item -ItemType Directory -Force -Path pkg/SKSE/Plugins | Out-Null
           Copy-Item build/windows/x64/release/TGCombatPort.dll pkg/SKSE/Plugins/
-          Compress-Archive -Path pkg/* -DestinationPath "TGCombatPort-${{ github.ref_name }}.zip" -Force
+          Compress-Archive -Path pkg/* -DestinationPath $name -Force
+          "PKG_NAME=$name" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          Write-Output "собран архив $name"
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -88,5 +91,5 @@ jobs:
           $notes | Out-File -Encoding utf8 notes.md
           gh release create $env:TAG --title "TGCombatPort $env:TAG" --notes-file notes.md `
             "build/windows/x64/release/TGCombatPort.dll" `
-            "TGCombatPort-$env:TAG.zip"
+            "$env:PKG_NAME"
 
