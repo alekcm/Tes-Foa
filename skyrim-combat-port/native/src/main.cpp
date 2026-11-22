@@ -37,8 +37,12 @@ namespace
 	std::atomic_bool g_enabled{ true };
 	std::atomic<std::uint64_t> g_calls{ 0 };
 	std::atomic<std::uint64_t> g_bashCandidates{ 0 };
+	std::atomic<std::uint64_t> g_blockingShieldCalls{ 0 };
 	std::atomic<std::uint64_t> g_boosts{ 0 };
 	std::atomic<std::uint64_t> g_bashSeenLogged{ 0 };
+	std::atomic<std::uint64_t> g_evalWhileBlocking{ 0 };   // AI оценивал любую атаку, пока игрок блокирует
+	std::atomic<std::uint64_t> g_rejectLogged{ 0 };
+	std::atomic<std::uint64_t> g_nonBashLogged{ 0 };
 
 	std::mutex g_cooldownLock;
 	std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> g_lastBoost;
@@ -71,8 +75,10 @@ namespace
 		const auto callIndex = g_calls.fetch_add(1, std::memory_order_relaxed) + 1;
 
 		if (callIndex % kStatsEveryCalls == 0) {
-			logs::info("hook stats: calls={} bash={} boosts={} enabled={}",
+			logs::info("hook stats: calls={} whileBlocking={} shieldCalls={} bash={} boosts={} enabled={}",
 				callIndex,
+				g_evalWhileBlocking.load(std::memory_order_relaxed),
+				g_blockingShieldCalls.load(std::memory_order_relaxed),
 				g_bashCandidates.load(std::memory_order_relaxed),
 				g_boosts.load(std::memory_order_relaxed),
 				g_enabled.load(std::memory_order_relaxed));
@@ -86,34 +92,48 @@ namespace
 		if (!player || a_self == player) {
 			return original;
 		}
-		if (!a_attackData->data.flags.any(RE::AttackData::AttackFlag::kBashAttack)) {
-			return original;
-		}
 
 		const bool playerBlocking = player->IsBlocking();
-
-		// Первые несколько bash-кандидатов пишем целиком: по ним видно, что хук вообще работает.
-		if (g_bashSeenLogged.fetch_add(1, std::memory_order_relaxed) < 10) {
-			logs::info("bash candidate: actor={} chance={:.2f} playerBlocking={} dist={:.0f}",
-				a_self->GetName(),
-				original,
-				playerBlocking,
-				a_self->GetPosition().GetDistance(player->GetPosition()));
-		}
-
 		if (!playerBlocking) {
 			return original;
 		}
-		if (!a_self->IsInCombat() || !a_self->IsHostileToActor(const_cast<RE::PlayerCharacter*>(player))) {
-			return original;
-		}
-		if (!HasShield(a_self)) {
+
+		g_evalWhileBlocking.fetch_add(1, std::memory_order_relaxed);
+
+		const float distance = a_self->GetPosition().GetDistance(player->GetPosition());
+		const bool inCombat = a_self->IsInCombat();
+		const bool hostile = inCombat && a_self->IsHostileToActor(const_cast<RE::PlayerCharacter*>(player));
+		const bool shield = hostile && HasShield(a_self);
+		const bool inRange = shield && distance <= kMeleeRadius;
+
+		if (!inRange) {
+			if (g_rejectLogged.fetch_add(1, std::memory_order_relaxed) < 10) {
+				logs::info("skip: actor={} inCombat={} hostile={} shield={} dist={:.0f}",
+					a_self->GetName(),
+					inCombat,
+					hostile,
+					shield,
+					distance);
+			}
 			return original;
 		}
 
-		const float distance = a_self->GetPosition().GetDistance(player->GetPosition());
-		if (distance > kMeleeRadius) {
+		g_blockingShieldCalls.fetch_add(1, std::memory_order_relaxed);
+
+		const bool isBash = a_attackData->data.flags.any(RE::AttackData::AttackFlag::kBashAttack);
+		if (!isBash) {
+			if (g_nonBashLogged.fetch_add(1, std::memory_order_relaxed) < 8) {
+				logs::info("eval while blocking (not bash): actor={} event={} chance={:.2f} dist={:.0f}",
+					a_self->GetName(),
+					a_attackData->event.c_str(),
+					original,
+					distance);
+			}
 			return original;
+		}
+
+		if (g_bashSeenLogged.fetch_add(1, std::memory_order_relaxed) < 10) {
+			logs::info("bash candidate: actor={} chance={:.2f} dist={:.0f}", a_self->GetName(), original, distance);
 		}
 
 		g_bashCandidates.fetch_add(1, std::memory_order_relaxed);
@@ -138,7 +158,7 @@ namespace
 			kBashBoostChance,
 			distance);
 
-		return (std::max)(original, kBashBoostChance);  // скобки: windows.h определяет max как макрос
+		return (std::max)(original, kBashBoostChance);
 	}
 
 	void InstallHook()
