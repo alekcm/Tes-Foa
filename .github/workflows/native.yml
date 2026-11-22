@@ -52,15 +52,26 @@ jobs:
         if: failure()
         shell: pwsh
         run: |
-          $log = @(Get-Content build.log -ErrorAction SilentlyContinue)
-          if ($log.Count -eq 0) {
-            Write-Output "::error::build.log пуст или отсутствует"
-            exit 1
+          # Ошибки вытаскиваем аннотациями: логи Actions лежат на blob-хосте, который из песочницы
+          # агента недоступен, а annotations читаются через API.
+          $found = $false
+          foreach ($file in @('cfg.log', 'build.log')) {
+            $log = @(Get-Content $file -ErrorAction SilentlyContinue)
+            if ($log.Count -eq 0) { continue }
+            $found = $true
+            $errs = $log | Where-Object { $_ -match 'error|failed|fatal|cannot' } | Select-Object -Last 15
+            foreach ($line in $errs) {
+              $clean = ($line -replace "`r", "" -replace "`n", " ")
+              Write-Output ("::error::[" + $file + "] " + $clean)
+            }
+            $tail = $log | Select-Object -Last 5
+            foreach ($line in $tail) {
+              $clean = ($line -replace "`r", "" -replace "`n", " ")
+              Write-Output ("::error::[" + $file + " хвост] " + $clean)
+            }
           }
-          $errs = $log | Where-Object { $_ -match 'error|failed|fatal' } | Select-Object -Last 12
-          foreach ($line in $errs) {
-            $clean = ($line -replace "`r", "" -replace "`n", " ")
-            Write-Output ("::error::" + $clean)
+          if (-not $found) {
+            Write-Output "::error::логов сборки нет ни одного"
           }
 
       - name: Upload DLL
