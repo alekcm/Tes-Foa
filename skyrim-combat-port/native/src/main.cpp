@@ -57,7 +57,7 @@ namespace
 	bool IsWatchedBash(RE::Actor* a_actor);
 	void OnBashLanded(RE::Actor* a_actor);
 	void OnBashFinished(RE::Actor* a_actor);
-	void OnPlayerHit(RE::Actor* a_attacker, REX::EnumSet<RE::TESHitEvent::Flag, std::uint8_t> a_flags);
+	void OnPlayerHit(RE::Actor* a_attacker, const RE::TESHitEvent* a_event);
 	void OrderBash(RE::Actor* a_actor, float a_distance, Clock::time_point a_now);
 
 	// Слушает animation events актёра, которому заказали баш: единственное, что граф реально
@@ -108,7 +108,7 @@ namespace
 			if (!actor || actor == player) {
 				return RE::BSEventNotifyControl::kContinue;
 			}
-			OnPlayerHit(actor, a_event->flags);
+			OnPlayerHit(actor, a_event);
 			return RE::BSEventNotifyControl::kContinue;
 		}
 	};
@@ -475,6 +475,27 @@ namespace
 		{ "crossbow", RE::WEAPON_TYPE::kCrossbow },
 	};
 
+	// Ссылка на форму из файла правил: пишется человеком (EditorID или плагин|0xID),
+	// при загрузке превращается в FormID. Расшифровка остаётся для лога.
+	struct FormFilter
+	{
+		RE::FormID  id{ 0 };
+		std::string text;
+	};
+
+	// Вид атаки определяется по форме, которую движок положил в TESHitEvent::source.
+	enum class AttackKind { kMelee = 1u << 0, kRanged = 1u << 1, kSpell = 1u << 2, kShout = 1u << 3, kUnarmed = 1u << 4 };
+
+	// Что движок сообщил о попадании: флаги, источник, снаряд, раса бьющего, вид атаки.
+	struct HitContext
+	{
+		std::uint8_t bits{ 0 };
+		RE::FormID   source{ 0 };
+		RE::FormID   projectile{ 0 };
+		RE::FormID   race{ 0 };
+		AttackKind   kind{ AttackKind::kUnarmed };
+	};
+
 	struct Rule
 	{
 		std::string                  name;
@@ -485,9 +506,14 @@ namespace
 		Tri                          playerBlocking{ Tri::kYes };
 		Tri                          playerShield{ Tri::kAny };
 		std::vector<RE::WEAPON_TYPE> weapons;
+		std::vector<FormFilter>      races;
+		std::vector<FormFilter>      sources;
+		std::vector<FormFilter>      projectiles;
+		unsigned                     kinds{ 0 };
 		bool                         reach{ true };
 		float                        cooldown{ 4.0f };
 		std::vector<EffectId>        effects;
+		bool                         valid{ true };
 		Clock::time_point            lastFired{};
 	};
 
@@ -650,6 +676,169 @@ namespace
 		return text;
 	}
 
+	// Допущение AS-13: LookupByEditorID и LookupFormID находят формы загруженных плагинов.
+	bool ResolveForm(const std::string& a_text, RE::FormID& a_out)
+	{
+		a_out = 0;
+		const auto bar = a_text.find('|');
+		if (bar != std::string::npos) {
+			// «Skyrim.esm|0x131E9» — форма из конкретного плагина, устойчиво к порядку загрузки.
+			const auto plugin = Trim(a_text.substr(0, bar));
+			const auto local = Trim(a_text.substr(bar + 1));
+			auto*      dataHandler = RE::TESDataHandler::GetSingleton();
+			if (!dataHandler) {
+				return false;
+			}
+			try {
+				a_out = dataHandler->LookupFormID(static_cast<RE::FormID>(std::stoul(local, nullptr, 16)), plugin);
+			} catch (...) {
+				return false;
+			}
+			return a_out != 0;
+		}
+		if (a_text.size() > 2 && a_text[0] == '0' && (a_text[1] == 'x' || a_text[1] == 'X')) {
+			try {
+				a_out = static_cast<RE::FormID>(std::stoul(a_text, nullptr, 16));
+			} catch (...) {
+				return false;
+			}
+			return a_out != 0;
+		}
+		// Обычное имя из Creation Kit, например BearRace.
+		if (const auto* form = RE::TESForm::LookupByEditorID(a_text)) {
+			a_out = form->GetFormID();
+			return a_out != 0;
+		}
+		return false;
+	}
+
+	std::string NameOf(RE::FormID a_formID)
+	{
+		if (a_formID == 0) {
+			return "00000000";
+		}
+		char buffer[256]{};
+		const auto* form = RE::TESForm::LookupByID(a_formID);
+		if (!form) {
+			std::snprintf(buffer, sizeof(buffer), "%08X", a_formID);
+			return buffer;
+		}
+		const auto* name = form->GetName();
+		std::snprintf(buffer, sizeof(buffer), "%s (%08X)", name ? name : "<без имени>", a_formID);
+		return buffer;
+	}
+
+	// Допущение AS-12: вид атаки выводим из формы в TESHitEvent::source:
+	// оружие → ближний бой или стрельба (лук/арбалет), заклинание/свиток → магия, крик → крик,
+	// снаряд (болт) → стрельба, ничего/существо → удар без оружия.
+	AttackKind ClassifyAttack(RE::FormID a_source)
+	{
+		const auto* form = a_source != 0 ? RE::TESForm::LookupByID(a_source) : nullptr;
+		if (!form) {
+			return AttackKind::kUnarmed;
+		}
+		switch (form->GetFormType()) {
+		case RE::FormType::Weapon:
+			{
+				const auto* weapon = form->As<RE::TESObjectWEAP>();
+				const auto  type = weapon ? weapon->GetWeaponType() : RE::WEAPON_TYPE::kHandToHandMelee;
+				return (type == RE::WEAPON_TYPE::kBow || type == RE::WEAPON_TYPE::kCrossbow) ?
+					AttackKind::kRanged : AttackKind::kMelee;
+			}
+		case RE::FormType::Ammo:
+			return AttackKind::kRanged;
+		case RE::FormType::Spell:
+		case RE::FormType::Scroll:
+			return AttackKind::kSpell;
+		case RE::FormType::Shout:
+			return AttackKind::kShout;
+		default:
+			return AttackKind::kUnarmed;
+		}
+	}
+
+	unsigned KindBit(AttackKind a_kind)
+	{
+		return static_cast<unsigned>(a_kind);
+	}
+
+	const char* KindText(AttackKind a_kind)
+	{
+		switch (a_kind) {
+		case AttackKind::kMelee: return "melee";
+		case AttackKind::kRanged: return "ranged";
+		case AttackKind::kSpell: return "spell";
+		case AttackKind::kShout: return "shout";
+		case AttackKind::kUnarmed: return "unarmed";
+		}
+		return "?";
+	}
+
+	bool ParseKind(const std::string& a_value, unsigned& a_out)
+	{
+		a_out = 0;
+		for (const auto& item : SplitList(a_value)) {
+			if (item == "any") {
+				continue;
+			}
+			if (item == "melee") { a_out |= KindBit(AttackKind::kMelee); }
+			else if (item == "ranged") { a_out |= KindBit(AttackKind::kRanged); }
+			else if (item == "spell") { a_out |= KindBit(AttackKind::kSpell); }
+			else if (item == "shout") { a_out |= KindBit(AttackKind::kShout); }
+			else if (item == "unarmed") { a_out |= KindBit(AttackKind::kUnarmed); }
+			else { return false; }
+		}
+		return true;
+	}
+
+	bool ParseFormList(const std::string& a_value, std::vector<FormFilter>& a_out)
+	{
+		a_out.clear();
+		for (const auto& item : SplitList(a_value)) {
+			if (item == "any") {
+				continue;
+			}
+			RE::FormID id = 0;
+			if (!ResolveForm(item, id)) {
+				logs::warn("Rules.txt: форма «{}» не найдена (нет такого EditorID/FormID/плагина)", item);
+				return false;
+			}
+			a_out.push_back(FormFilter{ id, item });
+		}
+		return true;
+	}
+
+	bool HasForm(const std::vector<FormFilter>& a_list, RE::FormID a_id)
+	{
+		return std::any_of(a_list.begin(), a_list.end(), [a_id](const FormFilter& a_item) { return a_item.id == a_id; });
+	}
+
+	std::string FormsText(const std::vector<FormFilter>& a_list)
+	{
+		if (a_list.empty()) {
+			return "any";
+		}
+		std::string text;
+		for (const auto& item : a_list) {
+			text += (text.empty() ? "" : ",") + item.text;
+		}
+		return text;
+	}
+
+	std::string KindsText(unsigned a_kinds)
+	{
+		if (a_kinds == 0) {
+			return "any";
+		}
+		std::string text;
+		for (const auto kind : { AttackKind::kMelee, AttackKind::kRanged, AttackKind::kSpell, AttackKind::kShout, AttackKind::kUnarmed }) {
+			if ((a_kinds & KindBit(kind)) != 0) {
+				text += (text.empty() ? "" : ",") + std::string(KindText(kind));
+			}
+		}
+		return text;
+	}
+
 	bool ApplyKey(Rule& a_rule, const std::string& a_key, const std::string& a_value)
 	{
 		if (a_key == "trigger") {
@@ -679,6 +868,35 @@ namespace
 			} else {
 				a_rule.hitForbid = bits;
 			}
+			return true;
+		}
+		if (a_key == "attacker.race") {
+			if (!ParseFormList(a_value, a_rule.races)) {
+				a_rule.valid = false;
+				return false;
+			}
+			return true;
+		}
+		if (a_key == "hit.source") {
+			if (!ParseFormList(a_value, a_rule.sources)) {
+				a_rule.valid = false;
+				return false;
+			}
+			return true;
+		}
+		if (a_key == "hit.projectile") {
+			if (!ParseFormList(a_value, a_rule.projectiles)) {
+				a_rule.valid = false;
+				return false;
+			}
+			return true;
+		}
+		if (a_key == "attack.kind") {
+			unsigned kinds = 0;
+			if (!ParseKind(a_value, kinds)) {
+				return false;
+			}
+			a_rule.kinds = kinds;
 			return true;
 		}
 		if (a_key == "attacker.shield") { return ParseTri(a_value, a_rule.attackerShield); }
@@ -758,13 +976,18 @@ namespace
 	{
 		logs::info("правил загружено: {}", g_rules.size());
 		for (const auto& rule : g_rules) {
-			logs::info("  [{}] trigger={} hit={:02X} not={:02X} attacker.shield={} attacker.weapon={} player.blocking={} player.shield={} reach={} do={}",
+			logs::info("  [{}]{} trigger={} hit={:02X} not={:02X} kind={} attacker.race={} attacker.weapon={} attacker.shield={} hit.source={} hit.projectile={} player.blocking={} player.shield={} reach={} do={}",
 				rule.name,
+				rule.valid ? "" : " (ОТКЛЮЧЕНО: ошибка в файле)",
 				TriggerText(rule.triggers),
 				static_cast<unsigned>(rule.hitRequire),
 				static_cast<unsigned>(rule.hitForbid),
-				TriText(rule.attackerShield),
+				KindsText(rule.kinds),
+				FormsText(rule.races),
 				WeaponsText(rule.weapons),
+				TriText(rule.attackerShield),
+				FormsText(rule.sources),
+				FormsText(rule.projectiles),
 				TriText(rule.playerBlocking),
 				TriText(rule.playerShield),
 				rule.reach,
@@ -856,21 +1079,33 @@ namespace
 	}
 
 	bool RuleMatches(const Rule& a_rule, unsigned a_trigger, RE::Actor* a_attacker,
-		RE::PlayerCharacter* a_player, std::uint8_t a_hitFlags)
+		RE::PlayerCharacter* a_player, const HitContext& a_hit)
 	{
-		if (!a_attacker || !a_player || a_attacker->IsDead()) {
+		if (!a_rule.valid || !a_attacker || !a_player || a_attacker->IsDead()) {
 			return false;
 		}
 		if ((a_rule.triggers & a_trigger) == 0) {
 			return false;
 		}
 		if (a_trigger == kTriggerHit) {
-			if ((a_hitFlags & a_rule.hitRequire) != a_rule.hitRequire) {
+			if ((a_hit.bits & a_rule.hitRequire) != a_rule.hitRequire) {
 				return false;
 			}
-			if ((a_hitFlags & a_rule.hitForbid) != 0) {
+			if ((a_hit.bits & a_rule.hitForbid) != 0) {
 				return false;
 			}
+		}
+		if (!a_rule.races.empty() && !HasForm(a_rule.races, a_hit.race)) {
+			return false;
+		}
+		if (!a_rule.sources.empty() && !HasForm(a_rule.sources, a_hit.source)) {
+			return false;
+		}
+		if (!a_rule.projectiles.empty() && !HasForm(a_rule.projectiles, a_hit.projectile)) {
+			return false;
+		}
+		if (a_rule.kinds != 0 && (a_rule.kinds & KindBit(a_hit.kind)) == 0) {
+			return false;
 		}
 		if (!MatchTri(a_rule.attackerShield, HasShield(a_attacker))) {
 			return false;
@@ -973,7 +1208,7 @@ namespace
 				continue;
 			}
 			auto& rule = g_rules[index];
-			if (!RuleMatches(rule, kTriggerBash, source, player, 0)) {
+			if (!RuleMatches(rule, kTriggerBash, source, player, HitContext{})) {
 				logs::info("rule skipped: [{}] источник уже не подходит", rule.name);
 				continue;
 			}
@@ -1006,30 +1241,54 @@ namespace
 
 	// Реакция на НАСТОЯЩЕЕ попадание по игроку: условия берутся из правил (Rules.txt).
 	// Допущение AS-5: движок заполняет флаги так, как описано в перечислении TESHitEvent::Flag.
-	void OnPlayerHit(RE::Actor* a_attacker, REX::EnumSet<RE::TESHitEvent::Flag, std::uint8_t> a_flags)
+	// Допущение AS-12: вид атаки выводим из формы в TESHitEvent::source.
+	void OnPlayerHit(RE::Actor* a_attacker, const RE::TESHitEvent* a_event)
 	{
 		auto* player = RE::PlayerCharacter::GetSingleton();
-		if (!player || !a_attacker) {
+		if (!player || !a_attacker || !a_event) {
 			return;
 		}
 
-		std::uint8_t bits = 0;
-		if (a_flags.any(RE::TESHitEvent::Flag::kHitBlocked)) {
-			bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked);
+		HitContext hit;
+		if (a_event->flags.any(RE::TESHitEvent::Flag::kHitBlocked)) {
+			hit.bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked);
 		}
-		if (a_flags.any(RE::TESHitEvent::Flag::kPowerAttack)) {
-			bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kPowerAttack);
+		if (a_event->flags.any(RE::TESHitEvent::Flag::kPowerAttack)) {
+			hit.bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kPowerAttack);
 		}
-		if (a_flags.any(RE::TESHitEvent::Flag::kBashAttack)) {
-			bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kBashAttack);
+		if (a_event->flags.any(RE::TESHitEvent::Flag::kBashAttack)) {
+			hit.bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kBashAttack);
 		}
-		if (a_flags.any(RE::TESHitEvent::Flag::kSneakAttack)) {
-			bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kSneakAttack);
+		if (a_event->flags.any(RE::TESHitEvent::Flag::kSneakAttack)) {
+			hit.bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kSneakAttack);
+		}
+		hit.source = a_event->source;
+		hit.projectile = a_event->projectile;
+		if (const auto* race = a_attacker->GetRace()) {
+			hit.race = race->GetFormID();
+		}
+		hit.kind = ClassifyAttack(hit.source);
+
+		if (g_hitLogged.fetch_add(1, std::memory_order_relaxed) < 20) {
+			logs::info("hit: actor={} kind={} flags={:02X} race={} source={} projectile={} игрок.блок={} игрок.щит={} враж.щит={}",
+				a_attacker->GetName(),
+				KindText(hit.kind),
+				static_cast<unsigned>(hit.bits),
+				NameOf(hit.race),
+				NameOf(hit.source),
+				NameOf(hit.projectile),
+				player->IsBlocking(),
+				HasShield(player),
+				HasShield(a_attacker));
+			const auto* heavyBlunt = GetHeavyBlunt(a_attacker);
+			if (heavyBlunt) {
+				logs::info("hit: у бьющего тяжёлое дробящее — {}", heavyBlunt->GetName());
+			}
 		}
 
 		bool matched = false;
 		for (auto& rule : g_rules) {
-			if (!RuleMatches(rule, kTriggerHit, a_attacker, player, bits)) {
+			if (!RuleMatches(rule, kTriggerHit, a_attacker, player, hit)) {
 				continue;
 			}
 			matched = true;
@@ -1039,16 +1298,9 @@ namespace
 			FireRule(rule, a_attacker, "попадание");
 		}
 
-		if (!matched && g_hitLogged.fetch_add(1, std::memory_order_relaxed) < 8) {
-			const auto* heavyBlunt = GetHeavyBlunt(a_attacker);
-			logs::info("hit без эффекта: actor={} flags={:02X} блок={} игрок.блок={} игрок.щит={} враж.щит={} оружие={}",
-				a_attacker->GetName(),
-				static_cast<unsigned>(bits),
-				a_flags.any(RE::TESHitEvent::Flag::kHitBlocked),
-				player->IsBlocking(),
-				HasShield(player),
-				HasShield(a_attacker),
-				heavyBlunt ? heavyBlunt->GetName() : (GetEquippedWeapon(a_attacker) ? GetEquippedWeapon(a_attacker)->GetName() : "<нет>"));
+		if (!matched && (hit.bits & static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked)) != 0 &&
+			g_rejectLogged.fetch_add(1, std::memory_order_relaxed) < 8) {
+			logs::info("hit без эффекта: удар был заблокирован, но ни одно правило не подошло (id выше)");
 		}
 	}
 
@@ -1069,7 +1321,7 @@ namespace
 		bool matched = false;
 		for (std::size_t index = 0; index < g_rules.size(); ++index) {
 			auto& rule = g_rules[index];
-			if (!RuleMatches(rule, kTriggerBash, a_actor, player, 0)) {
+			if (!RuleMatches(rule, kTriggerBash, a_actor, player, HitContext{})) {
 				continue;
 			}
 			matched = true;

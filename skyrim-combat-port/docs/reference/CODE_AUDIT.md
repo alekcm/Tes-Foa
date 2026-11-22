@@ -27,6 +27,11 @@
 | `IsWatchedBash` | только свои заказы (иначе вмешивались бы в ванильный AI) | — | — |
 | `InitStaggerSpell` | `MagicItem::HasEffect(EffectArchetype::kStagger)`; CK Wiki: архетип и смысл magnitude/duration **[B]** | — | `stagger spell: …`, `stagger: выбран спелл …` |
 | `StaggerOnCooldown` | наша логика (4 с) | — | — |
+| `ResolveForm` | `TESForm::LookupByEditorID`, `TESDataHandler::LookupFormID`, `TESForm::LookupByID` **[A]** | `AS-13` | `Rules.txt: форма «…» не найдена` при опечатке |
+| `NameOf` | `TESForm::LookupByID` + `TESForm::GetName` **[A]** | — | `hit: … race=BearRace (000131E9)` |
+| `ClassifyAttack` | `TESForm::GetFormType`, `TESObjectWEAP::GetWeaponType` **[A]** | `AS-12` | `hit: … kind=unarmed/spell/shout` |
+| `KindBit` / `KindText` / `ParseKind` / `KindsText` | биты вида атаки, имена `melee/ranged/spell/shout/unarmed` | — | `attack.kind=…` в строке правила |
+| `ParseFormList` / `HasForm` / `FormsText` | разбор и сверка списков форм (раса, источник, снаряд) | `AS-13` | `(ОТКЛЮЧЕНО: ошибка в файле)` |
 | `GetEquippedWeapon` | `TESForm::As<TESObjectWEAP>()` по `Actor::GetEquippedObject` **[A]** | — | `hit без эффекта: … оружие=…` |
 | `MatchTri` | сопоставление `any/yes/no` с фактом | — | — |
 | `Trim` / `SplitList` | разбор строк файла правил | — | — |

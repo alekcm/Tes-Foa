@@ -16,8 +16,12 @@ DLL и файл правил лежат рядом, поэтому правка 
 trigger         = hit, bash
 hit-flags       = blocked
 hit-not-flags   = power
-attacker.shield = yes | no | any
+attack.kind     = melee, ranged, spell, shout, unarmed | any
+attacker.race   = BearRace, Skyrim.esm|0x131E9, 0x000131E9
 attacker.weapon = mace, battleaxe, sword, axe, dagger, greatsword, fists, bow, staff, crossbow | any
+attacker.shield = yes | no | any
+hit.source      = <форма чем бьют: оружие / заклинание / крик>
+hit.projectile  = <форма снаряда: болт / стрела / файрбол>
 player.blocking = yes | no | any
 player.shield   = yes | no | any
 reach           = yes | no
@@ -31,7 +35,11 @@ do              = unblock, stagger
 | `hit-flags` | какие флаги попадания **обязаны** быть: `blocked` (`kHitBlocked`), `power` (`kPowerAttack`), `bash` (`kBashAttack`), `sneak` (`kSneakAttack`) |
 | `hit-not-flags` | каких флагов быть **не должно** |
 | `attacker.shield` | щит у того, кто бьёт |
+| `attack.kind` | вид атаки: `melee`, `ranged`, `spell`, `shout`, `unarmed` — выводится из формы в `TESHitEvent::source` (`AS-12`) |
+| `attacker.race` | раса бьющего: `TESRace` (`Actor::GetRace`) |
 | `attacker.weapon` | тип оружия в руках бьющего (`RE::WEAPON_TYPE`); список = «любой из» |
+| `hit.source` | форма, которой нанесён удар: оружие, заклинание, крик (`TESHitEvent::source`) |
+| `hit.projectile` | форма снаряда: болт, стрела, огненный шар (`TESHitEvent::projectile`) |
 | `player.blocking` | игрок блокирует прямо сейчас (`Actor::IsBlocking()`) |
 | `player.shield` | игрок блокирует **щитом** (щит в левой руке) |
 | `reach` | проверять дистанцию `fCombatBashReach` (читается из настроек движка) |
@@ -93,10 +101,76 @@ do = unblock, stagger
 cooldown = 4
 ```
 
+**«Удар медведя выбивает из равновесия»** — новая секция (у существа нет оружия, поэтому
+фильтр по оружию не ставится; `reach = no`, потому что `fCombatBashReach` — про баш, а не про лапы):
+
+```
+[bear-paw-breaks-block]
+trigger = hit
+hit-flags = blocked
+attacker.race = BearRace
+player.blocking = yes
+do = unblock, stagger
+reach = no
+cooldown = 4
+```
+
+**«Особый разрывной болт»** — фильтр по снаряду (значение из лога `projectile=`):
+
+```
+[explosive-bolt-breaks-block]
+trigger = hit
+hit-flags = blocked
+hit.projectile = 0x00000000
+player.blocking = yes
+do = unblock, stagger
+```
+
+**«Особое заклинание»** — фильтр по виду атаки и форме:
+
+```
+[special-spell-breaks-block]
+trigger = hit
+hit-flags = blocked
+attack.kind = spell
+hit.source = 0x00000000
+player.blocking = yes
+do = unblock, stagger
+```
+
+**«Дыхание дракона»** — приходит как крик:
+
+```
+[dragon-breath-breaks-block]
+trigger = hit
+hit-flags = blocked
+attack.kind = shout
+attacker.race = DragonRace
+player.blocking = yes
+do = unblock, stagger
+```
+
 **«Хочу, чтобы в этот момент меня ещё и отбрасывало»** — пока такого эффекта нет; добавляется так:
 одна запись в `kEffectTable` (`{ "knockback", EffectId::kKnockback }`), `case` в `RunEffect`
 и функция, которая это делает. После этого — просто `do = unblock, stagger, knockback` в правилах,
 для любого врага и любой атаки, без правки логики.
+
+## Формы: как записывать
+
+| Запись | Что это |
+|---|---|
+| `BearRace` | EditorID из Creation Kit — самый простой способ |
+| `Skyrim.esm|0x131E9` | плагин + локальный FormID, не зависит от порядка загрузки |
+| `0x000131E9` | полный FormID, как он есть в этой игре |
+
+Откуда брать значения: строка лога на каждое попадание
+
+```
+hit: actor=Медведь kind=unarmed flags=08 race=BearRace (000131E9) source=00000000 projectile=00000000 игрок.блок=true игрок.щит=false враж.щит=false
+```
+
+Если форма не нашлась при загрузке, правило помечается `(ОТКЛЮЧЕНО: ошибка в файле)` — молча
+работать «на всё подряд» оно не будет.
 
 ## Чего в условиях пока нет
 

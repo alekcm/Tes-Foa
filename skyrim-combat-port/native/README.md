@@ -3,7 +3,7 @@
 Здесь лежит C++ часть мода. Она нужна только для того, чего не умеет Papyrus:
 точное чтение состояния анимации и (в перспективе) управление действиями NPC.
 
-## Что уже есть (0.8.0)
+## Что уже есть (0.9.0)
 
 Хуков (патчинга кода игры) нет: версия 0.1.1 патчила `Actor::GetAttackChance` и вызывала вылет, способ убран.
 
@@ -64,6 +64,26 @@ stagger applied: баш щитоносца, игрок блокирует без
 Пошагово, для первого раза: [`docs/console_spawn.md`](../docs/console_spawn.md). Коротко: `ё` —
 консоль, `help draugr 4`, клик по строке, `player.placeatme <ID> 1`, Enter. Для проверки механики
 это не требуется: она срабатывает в любой драке с бандитом, у которого есть щит.
+
+### 0.9.0: в правилах — любая атака любого существа
+
+К условиям правил добавлены фильтры по тому, **чем** нанесён удар (всё берётся из `RE::TESHitEvent`):
+
+| Ключ | Что отбирает | Пример |
+|---|---|---|
+| `attacker.race` | раса бьющего (`Actor::GetRace`) | `BearRace`, `Skyrim.esm + 0x131E9`, `0x000131E9` |
+| `hit.source` | форма удара: оружие, заклинание, крик | `0x0003B562` |
+| `hit.projectile` | снаряд: болт, стрела, файрбол | значение из лога |
+| `attack.kind` | вид атаки: `melee/ranged/spell/shout/unarmed` | `shout` для дыхания дракона |
+
+Формы разрешаются при загрузке (`LookupByEditorID`, `LookupFormID`); ненайденная форма не «пропускает
+всё подряд», а помечает правило `(ОТКЛЮЧЕНО: ошибка в файле)`. Каждое попадание печатается строкой
+
+```
+hit: actor=Медведь kind=unarmed flags=08 race=BearRace (000131E9) source=00000000 projectile=00000000 …
+```
+
+— из неё берутся точные значения для `hit.source` и `hit.projectile`.
 
 ### 0.8.0: правила — данные, а не код
 
@@ -231,7 +251,7 @@ xmake build
 
 Собранный плагин публикуется как GitHub Release по тегу `v*`:
 
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.8.0/TGCombatPort-v0.8.0.zip —
+- https://github.com/alekcm/Tes-Foa/releases/download/v0.9.0/TGCombatPort-v0.9.0.zip —
   архив с `SKSE/Plugins/TGCombatPort.dll`, распаковывается в папку `Data` игры
   или ставится как обычный мод в Vortex.
 
@@ -251,15 +271,15 @@ xmake build
   (`dir "%USERPROFILE%\Downloads\TGCombatPort*.dll"`) и скопируйте нужный с переименованием;
 - если мод стоит в **Vortex**, он раскладывает файлы в `Data` сам при развёртывании и может вернуть
   старую версию поверх ручной копии. В этом случае ставить надо архив
-  (`TGCombatPort-v0.8.0.zip`) через Vortex → Install From File, а не копированием.
+  (`TGCombatPort-v0.9.0.zip`) через Vortex → Install From File, а не копированием.
 
 ## Установка (для проверки)
 
-1. Скачать `TGCombatPort-v0.8.0.zip` по ссылке выше.
+1. Скачать `TGCombatPort-v0.9.0.zip` по ссылке выше.
 2. Распаковать в папку `Data` игры (cmd):
 
 ```cmd
-tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.8.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
+tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.9.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
 ```
 
 3. Поставить **Address Library v13** (Nexus, мод 32444, файл для 1.6+) — без него DLL не загрузится.

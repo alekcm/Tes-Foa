@@ -5,21 +5,32 @@
 # Каждая секция [имя] — одно правило. «Хочу, чтобы такая-то атака такого-то врага
 # делала то же самое» — это новая секция здесь, код менять не нужно.
 #
-# Ключи:
+# ── условия ────────────────────────────────────────────────────────────────────
 #   trigger         = hit, bash      hit — настоящее попадание; bash — наш заказанный баш
-#   hit-flags       = blocked, power, bash, sneak   (все перечисленные должны быть у попадания)
+#   hit-flags       = blocked, power, bash, sneak   (все перечисленные должны быть)
 #   hit-not-flags   = power          (ни одного из перечисленных быть не должно)
-#   attacker.shield = yes | no | any   щит у того, кто бьёт
-#   attacker.weapon = mace, battleaxe, sword, … | any
-#   player.blocking = yes | no | any   игрок блокирует прямо сейчас
-#   player.shield   = yes | no | any   игрок блокирует щитом
-#   reach           = yes | no         проверять дистанцию fCombatBashReach
+#   attack.kind     = melee, ranged, spell, shout, unarmed, any
+#   attacker.race     = <раса>        например BearRace; список через запятую
+#   attacker.weapon   = mace, battleaxe, sword, … | any     (тип оружия в руках)
+#   attacker.shield   = yes | no | any
+#   hit.source      = <форма>        то, чем бьют: оружие, заклинание, крик (TESHitEvent::source)
+#   hit.projectile  = <форма>        снаряд: болт, стрела, файрбол (TESHitEvent::projectile)
+#   player.blocking = yes | no | any
+#   player.shield   = yes | no | any
+#   reach           = yes | no       проверять дистанцию fCombatBashReach
 #   cooldown        = секунды между срабатываниями правила
 #   do              = unblock, stagger, bash   (порядок сохраняется)
 #
-# Эффекты: unblock — снять блок и удерживать снятым ~1 с;
-#          stagger — стаггер спеллом от имени бьющего (дезориентация);
-#          bash    — заказать бьющему баш.
+# ── как записывать формы (раса, оружие, снаряд, заклинание) ────────────────────
+#   BearRace                — EditorID из Creation Kit (самый удобный способ)
+#   Skyrim.esm|0x131E9      — плагин и локальный FormID (не зависит от порядка загрузки)
+#   0x000131E9              — полный FormID как он есть в этой игре
+#   Значения для конкретного удара берутся из строки лога "hit: … race=… source=… projectile=…".
+#
+# ── эффекты ────────────────────────────────────────────────────────────────────
+#   unblock  — снять блок у игрока и удерживать снятым ~1 с
+#   stagger  — стаггер спеллом от имени бьющего (дезориентация)
+#   bash     — заказать бьющему баш
 
 [bandit-bash-breaks-weapon-block]
 # Щитоносец выбивает из блока того, кто блокирует оружием или кулаками (правило 1).
@@ -40,3 +51,47 @@ player.blocking = yes
 player.shield = yes
 do = unblock, stagger
 cooldown = 4
+
+# ── примеры, которые сейчас выключены (уберите # перед [ ] и ключами) ──────────
+
+# Удар медведя выбивает из равновесия любого, кто блокирует.
+# У существа нет оружия в руках, поэтому фильтр по оружию тут не ставится;
+# если нужно «только медведь», оставьте attacker.race.
+#[bear-paw-breaks-block]
+#trigger = hit
+#hit-flags = blocked
+#attacker.race = BearRace
+#player.blocking = yes
+#do = unblock, stagger
+#reach = no
+#cooldown = 4
+
+# Особый разрывной болт: фильтр по снаряду (projectile) или по источнику (source).
+# Точные формы — из строки лога "hit: … source=… projectile=…".
+#[explosive-bolt-breaks-block]
+#trigger = hit
+#hit-flags = blocked
+#hit.projectile = 0x00000000
+#player.blocking = yes
+#do = unblock, stagger
+#cooldown = 4
+
+# Особое заклинание: фильтр по форме заклинания.
+#[special-spell-breaks-block]
+#trigger = hit
+#hit-flags = blocked
+#attack.kind = spell
+#hit.source = 0x00000000
+#player.blocking = yes
+#do = unblock, stagger
+#cooldown = 4
+
+# Дыхание дракона приходит как крик (shout): фильтр по виду атаки и форме крика.
+#[dragon-breath-breaks-block]
+#trigger = hit
+#hit-flags = blocked
+#attack.kind = shout
+#attacker.race = DragonRace
+#player.blocking = yes
+#do = unblock, stagger
+#cooldown = 4
