@@ -11,15 +11,10 @@
 ; «игрок сейчас блокирует», который может читать любой другой скрипт мода, не подписываясь
 ; на события повторно.
 ;
-; Что делает дополнительно (с 0.1.3): при начале блока игрока пробует «щитовой баш» ближайшего
-; противника через Debug.SendAnimationEvent(target, "bashStart"), не чаще раза в 7 секунд.
-; Это приближение дизайна «щитовой финт → баш»: событие проигрывает анимацию, но AI противника
-; не переписывает. У функции есть известное предупреждение: отправка animation event актёру может
-; рассинхронизировать его внутреннее состояние анимации (CK Wiki, Debug.SendAnimationEvent).
-; Поэтому вызов ограничен кулдауном и проверками, а в лог пишется результат каждой попытки.
-;
-; Финт живёт в этом скрипте временно, чтобы не требовалось заново открывать CK: отдельный скрипт
-; потребовал бы добавить его на алиас вручную. Разделим, когда появится второй алиас/способность.
+; Чего здесь НЕТ и почему: ответного действия бандита («щитовой финт → баш»). Ванильная
+; Debug.SendAnimationEvent для этого не годится — пользователь выбрал реализацию через SKSE
+; (см. native/README.md: плагин TGCombatPort.dll). Приказ NPC на действие будет отдаваться из
+; DLL, а этот скрипт останется только источником признака «игрок блокирует».
 
 ;
 ; Настройка в CK:
@@ -38,11 +33,6 @@ ScriptName TGCP_PlayerBlockWatcher extends ReferenceAlias
 GlobalVariable Property PlayerBlocking Auto
 
 Bool Registered
-
-; --- параметры «финта» ---
-Float LastFeintTime
-Float FeintCooldown = 7.0
-Float FeintRadius = 250.0
 
 Event OnInit()
     Setup()
@@ -82,48 +72,8 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
     If asEventName == "blockStart" || asEventName == "blockStartOut"
         PlayerBlocking.SetValue(1.0)
         Debug.Trace("[TGCP] player block start (" + asEventName + ")")
-        TryFeint()
     ElseIf asEventName == "blockStop"
         PlayerBlocking.SetValue(0.0)
         Debug.Trace("[TGCP] player block stop (" + asEventName + ")")
     EndIf
 EndEvent
-
-; Пробует изобразить «щитовой баш» ближайшего противника. Ничего не делает, если рядом никого,
-; если ближайший не дерётся с игроком, если нет линии видимости или не прошёл кулдаун.
-Function TryFeint()
-    Float now = Utility.GetCurrentRealTime()
-    If now - LastFeintTime < FeintCooldown
-        Debug.Trace("[TGCP] feint: cooldown, ещё " + (FeintCooldown - (now - LastFeintTime)) + " c")
-        Return
-    EndIf
-
-    Actor player = GetActorReference()
-    If player == None
-        Debug.Trace("[TGCP] feint: alias has no actor")
-        Return
-    EndIf
-
-    Actor target = Game.FindClosestActorFromRef(player, FeintRadius)
-    If target == None
-        Debug.Trace("[TGCP] feint: no actor within " + FeintRadius + " units")
-        Return
-    EndIf
-    If target == player
-        Debug.Trace("[TGCP] feint: closest actor is the player")
-        Return
-    EndIf
-    If target.GetCombatTarget() != player
-        Debug.Trace("[TGCP] feint: closest actor is not fighting the player: " + target)
-        Return
-    EndIf
-    If !player.HasLOS(target)
-        Debug.Trace("[TGCP] feint: no line of sight to " + target)
-        Return
-    EndIf
-
-    LastFeintTime = now
-    Debug.Trace("[TGCP] feint: sending bashStart to " + target)
-    Debug.SendAnimationEvent(target, "bashStart")
-    Debug.Trace("[TGCP] feint: bashStart sent")
-EndFunction
