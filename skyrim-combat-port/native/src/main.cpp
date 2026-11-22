@@ -29,7 +29,7 @@ namespace
 
     bool RegisterPapyrusFunctions(RE::BSScript::IVirtualMachine* a_vm)
     {
-        a_vm->RegisterFunction("IsBlocking"sv, "TGCP_Native"sv, IsBlocking);
+        a_vm->RegisterFunction("IsBlocking"sv, "TGCP_Native"sv, IsBlocking, false);
         logs::info("TGCP_Native.IsBlocking зарегистрирована"sv);
         return true;
     }
