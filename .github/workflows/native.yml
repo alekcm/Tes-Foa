@@ -88,6 +88,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path pkg/SKSE/Plugins/TGCombatPort | Out-Null
           Copy-Item build/windows/x64/release/TGCombatPort.dll pkg/SKSE/Plugins/
           Copy-Item rules/Rules.txt pkg/SKSE/Plugins/TGCombatPort/
+          Copy-Item -Recurse assets/anim/meshes pkg/
           Write-Output "правила: $(Get-Content rules/Rules.txt | Measure-Object -Line | Select-Object -ExpandProperty Lines) строк"
           Compress-Archive -Path pkg/* -DestinationPath $name -Force
           "PKG_NAME=$name" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
@@ -103,7 +104,7 @@ jobs:
           $notes = @"
           SKSE-плагин TGCombatPort (часть мода). Проверка: DLL собран из ``skyrim-combat-port/native``.
 
-          Установка: распаковать архив в папку игры (появятся ``Data\SKSE\Plugins\TGCombatPort.dll`` и ``Data\SKSE\Plugins\TGCombatPort\Rules.txt``)
+          Установка: распаковать архив в папку игры (появятся ``Data\SKSE\Plugins\TGCombatPort.dll``, ``Data\SKSE\Plugins\TGCombatPort\Rules.txt`` и папка анимаций ``Data\meshes\actors\character\…\DynamicAnimationReplacer`` для укола кинжалом/мечом; анимации требуют мода Dynamic Animation Replacer)
           или установить zip через Vortex. Отдельный .dll не выкладываем: браузеры блокируют такое скачивание. Нужны SKSE64 2.3.1 (runtime 1.7.104) и Address Library v13.
           "@
           $notes | Out-File -Encoding utf8 notes.md

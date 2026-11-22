@@ -171,27 +171,21 @@
 | Двуручный молот | `blunt` | `hammerHeavy` | ломает S1 и S2 |
 | Кулаки | `blunt` слабый | без изменений | ничего |
 
-**Про анимацию укола (проверено).** В ванильном наборе отдельных клипов укола нет: список
-ванильных путей анимаций (`Monitor221hz/Pandora-Behaviour-Engine-Plus`,
-`vanilla_hkxpaths.txt`, 5586 записей) содержит для одноручного оружия только
-`1hm_attackpowerfwd.hkx`, `1hm_attackpower.hkx`, `1hm_attackpowerleft/right/bwd.hkx` **[A]** —
-кинжал и меч бьют одними и теми же клипами силовой атаки. Значит клип укола нужно **сделать**:
-своя анимация (HKX) либо замена клипа через DAR/OAR.
+**Про анимацию укола (проверено по файлам игры).** Пользователь распаковал все анимации игры —
+и в них **уже есть укол**:
 
-Инструменты для HKX (проверено): `Dexesttp/hkxpack` — pack/unpack в TagXML, но целевой формат
-hk_2014 (Fallout 4) и нужна Java **[A: README]**; для Skyrim SE — Windows-инструменты
-`martinrhan/HKXPoserNG`, `TackYs/armaToHKX`, `BlessingS91/HKX-Toolset`, `hoverstein/HKXShift` **[A]**.
-В этой песочнице ни Java, ни Windows-инструментов нет, поэтому клип делается так: берём ванильный
-`1hm_attackpowerfwd.hkx` из твоей папки `Data`, правим в TagXML/редакторе и пакуем обратно — файл
-кладём в `Data\meshes\actors\character\animations\` (при использовании OAR — в папку мода
-с условием «weapon type = dagger/sword + power attack»).
+| Нужно | Что взято | Почему |
+|---|---|---|
+| вид от первого лица | `_1stperson\animations\1hm_attackstab.hkx` | это и есть ванильный укол одноручным |
+| вид от третьего лица | `animations\1hm_sneakattackpowerforward.hkx` | ванильный выпад/укол силовой атакой |
+| назначение | клип `1hm_attackpowerfwd.hkx` (прямая силовая атака одноручным) | имя клипа совпадает с событием `attackPowerStartForward` |
 
-Ванильные анимации в SE упакованы в `Data\Skyrim - Animations.bsa` (список базовых архивов SE:
-`Nexus-Mod-Manager`, `Game Modes/Definitions/SkyrimSE/skyrimse_base.txt`) **[A]**, поэтому файл
-сначала достаётся распаковщиком BSA. Пошаговая инструкция для пользователя —
-[`../assets/anim/README.md`](../assets/anim/README.md).
-
----
+Оба файла — настоящий Havok-пак (`57 E0 E0 57` = `hk_2010.2.0-r1`), копируются как есть, править
+бинарник не нужно. Отбор «только кинжал и меч» делается условием DAR
+(`IsEquippedRightType(1)` = мечи, `IsEquippedRightType(2)` = кинжалы; синтаксис и номера — из
+документации DAR, процитированной в открытой реализации `noxsidereum/dargh`, `src/DARProject.cpp`)
+**[A: исходники]**. Пакет лежит в `native/assets/anim/`, ставится вместе с архивом релиза, требует мода
+Dynamic Animation Replacer. Инструкция: [`../native/assets/anim/README.md`](../native/assets/anim/README.md).
 
 ## 6. Травмы, кровотечение и части тела
 

@@ -63,9 +63,13 @@
 - **0.11.0 (в игре ещё не проверялась):** условие `player.ward` (`GetActorValue(kWardPower) > 0`),
   эффект `chip` (урон сквозь блок через `DamageActorValue`), правила уколов кинжала/меча в `Rules.txt`.
   В каждой строке попадания печатается `вард=<число>`.
-- **Анимация укола — заблокирована на одном файле.** Ванильного клипа укола нет; нужен
-  `1hm_attackpowerfwd.hkx` из архива `Data\Skyrim - Animations.bsa`. Инструкция по извлечению и
-  передаче файла: [`assets/anim/README.md`](assets/anim/README.md).
+- **0.12.0 — анимация укола без правки бинарников.** Пользователь распаковал все анимации игры, и
+  в них нашлись готовые уколы: `_1stperson\animations\1hm_attackstab.hkx` (первое лицо) и
+  `animations\1hm_sneakattackpowerforward.hkx` (выпад в третьем лице). Они назначаются клипом
+  `1hm_attackpowerfwd.hkx` через Dynamic Animation Replacer с условием `IsEquippedRightType(1) OR
+  IsEquippedRightType(2)` (мечи и кинжалы; номера типов — из документации DAR в открытой
+  реализации `noxsidereum/dargh`). Файлы и инструкция: [`native/assets/anim/`](native/assets/anim/README.md).
+  Топор, булава и молот бьют по-прежнему. В игре **ещё не проверялось**.
 - Implementation: частично — четыре Papyrus-скрипта **скомпилированы** настоящим PapyrusCompiler (0 ошибок, 0 предупреждений, 2026-11-21, runtime 1.7.104.0); записей в плагине нет.
 - Build: скрипты собраны (4 `.pex`); плагин `.esp` не собран, zip не собирался.
 - In-game test: **мод запускается и работает**. 22.11.2026, лог `Papyrus.0.log` (05:10:51–05:13:05),
