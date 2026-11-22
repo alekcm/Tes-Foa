@@ -1,0 +1,41 @@
+name: native
+
+on:
+  push:
+    paths:
+      - "skyrim-combat-port/native/**"
+      - ".github/workflows/native.yml"
+  pull_request:
+    paths:
+      - "skyrim-combat-port/native/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build SKSE plugin
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: skyrim-combat-port/native
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: latest
+          build-cache: false
+
+      - name: Clone CommonLibSSE-NG
+        run: git clone --depth 1 -b ng https://github.com/alandtse/CommonLibVR.git lib/commonlibsse-ng
+
+      - name: Build
+        run: xmake f -y -m release && xmake build -y
+
+      - name: Upload DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: TGCombatPort-dll
+          path: skyrim-combat-port/native/build/windows/**/*.dll
+          if-no-files-found: error
