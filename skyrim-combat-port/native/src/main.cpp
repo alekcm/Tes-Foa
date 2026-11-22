@@ -16,6 +16,12 @@
 // но вызванный из DLL, вместе с нашими проверками и кулдауном.
 //
 // Хуков (патчинга кода игры) в этой версии нет: 0.1.1 патчила Actor::GetAttackChance и вызывала вылет.
+//
+// 0.6.1 — почему баш «не выбивал»: ванильный баш блок НЕ ломает. Он снимает выносливость и даёт
+// короткий ступор, но блок остаётся — ровно то, что видно в игре («бьют рукой, стаггер есть,
+// из блока не вылетаю»). Выход из блока в движке даёт только эффект с архетипом Stagger
+// (на время стаггера блок невозможен). Своего .esp в моде нет, поэтому берём уже загруженный
+// игрой спелл со стаггером и кастуем его на игрока в момент удара щитоносца.
 
 #include "pch.h"
 
@@ -42,6 +48,10 @@ namespace
 	std::atomic<std::uint64_t> g_powerWindows{ 0 };
 	std::atomic<std::uint64_t> g_rejectLogged{ 0 };
 
+	bool HasShield(RE::Actor* a_actor);
+	bool IsWatchedBash(RE::Actor* a_actor);
+	void OnBashLanded(RE::Actor* a_actor);
+
 	// Слушает animation events бандита, которому только что заказали баш: подтверждение,
 	// что замах реально проигрался.
 	class BashWatchSink final : public RE::BSTEventSink<RE::BSAnimationGraphEvent>
@@ -53,7 +63,10 @@ namespace
 				return RE::BSEventNotifyControl::kContinue;
 			}
 			const std::string_view tag{ a_event->tag.c_str() };
-			if (tag == "bashStart"sv || tag == "bashStop"sv || tag == "bashRelease"sv) {
+			if (tag == "bashStart"sv) {
+				auto* ref = a_event->holder;
+				OnBashLanded(ref ? ref->As<RE::Actor>() : nullptr);
+			} else if (tag == "bashStop"sv || tag == "bashRelease"sv) {
 				logs::info("bandit anim: {} ({})", tag, a_event->holder ? a_event->holder->GetName() : "?");
 			}
 			return RE::BSEventNotifyControl::kContinue;
@@ -91,6 +104,148 @@ namespace
 	std::unordered_map<RE::FormID, std::vector<std::string>> g_bashEventsByRace;
 	std::atomic<std::uint64_t> g_dumpedRaces{ 0 };
 	std::unordered_map<RE::FormID, Clock::time_point> g_lastPower;
+
+	// --- 0.6.1: гарантированный выход из блока (эффект Stagger) ---
+	constexpr float kStaggerDelaySeconds = 0.25f;  // стаггер применяем на удар, не на замах
+	constexpr float kStaggerCooldown = 3.0f;       // не чаще раза в 3 с
+
+	RE::SpellItem*             g_staggerSpell{ nullptr };
+	bool                       g_staggerSearched{ false };
+	std::atomic<std::uint64_t> g_staggers{ 0 };
+	std::vector<Clock::time_point> g_pendingStaggers;
+	Clock::time_point          g_lastStagger{};
+
+	bool IsWatchedBash(RE::Actor* a_actor)
+	{
+		if (!a_actor) {
+			return false;
+		}
+		return std::any_of(g_watches.begin(), g_watches.end(),
+			[a_actor](const Watch& w) { return w.actor.get().get() == a_actor; });
+	}
+
+	// Ищем уже загруженный игрой спелл, единственный эффект которого — движковый стаггер.
+	void InitStaggerSpell()
+	{
+		g_staggerSearched = true;
+		auto* handler = RE::TESDataHandler::GetSingleton();
+		if (!handler) {
+			logs::info("stagger: TESDataHandler недоступен, стаггер недоступен");
+			return;
+		}
+
+		int          total = 0;
+		int          shown = 0;
+		int          bestEffects = 100000;
+		RE::SpellItem* best = nullptr;
+
+		for (auto* spell : handler->GetFormArray<RE::SpellItem>()) {
+			if (!spell || !spell->HasEffect(RE::EffectArchetype::kStagger)) {
+				continue;
+			}
+			++total;
+
+			const auto effectCount = static_cast<int>(spell->effects.size());
+			std::uint32_t duration = 0;
+			float         magnitude = 0.0f;
+			for (auto* effect : spell->effects) {
+				if (effect && effect->baseEffect && effect->baseEffect->HasArchetype(RE::EffectArchetype::kStagger)) {
+					duration = effect->effectItem.duration;
+					magnitude = effect->effectItem.magnitude;
+					break;
+				}
+			}
+
+			if (shown < 12) {
+				++shown;
+				logs::info("  stagger spell: {} ({:08X}) type={} cast={} delivery={} effects={} dur={} mag={:.1f} cost={}",
+					spell->GetName(),
+					spell->GetFormID(),
+					static_cast<int>(spell->GetSpellType()),
+					static_cast<int>(spell->GetCastingType()),
+					static_cast<int>(spell->GetDelivery()),
+					effectCount,
+					duration,
+					magnitude,
+					spell->data.costOverride);
+			}
+
+			const bool plainSpell = spell->GetSpellType() == RE::MagicSystem::SpellType::kSpell;
+			const bool fireAndForget = spell->GetCastingType() == RE::MagicSystem::CastingType::kFireAndForget;
+			if (plainSpell && fireAndForget && effectCount < bestEffects) {
+				bestEffects = effectCount;
+				best = spell;
+			}
+		}
+
+		g_staggerSpell = best;
+		if (best) {
+			logs::info("stagger: выбран спелл {} ({:08X}) из {} кандидатов, эффектов {}",
+				best->GetName(),
+				best->GetFormID(),
+				total,
+				bestEffects);
+		} else {
+			logs::info("stagger: подходящего спелла нет (кандидатов {}) — блок не ломаем, работает только баш", total);
+		}
+	}
+
+	void CastStaggerOnPlayer(const char* a_why)
+	{
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		if (!player || !g_staggerSpell) {
+			return;
+		}
+		auto* caster = player->GetMagicCaster(RE::MagicSystem::CastingSource::kInstant);
+		if (!caster) {
+			logs::info("stagger: у игрока нет magical caster kInstant");
+			return;
+		}
+
+		caster->CastSpellImmediate(g_staggerSpell, true, player, 1.0f, false, 0.0f, nullptr);
+		g_staggers.fetch_add(1, std::memory_order_relaxed);
+		logs::info("stagger applied: {} spell={} ({:08X})", a_why, g_staggerSpell->GetName(), g_staggerSpell->GetFormID());
+	}
+
+	// Баш реально проигрался. Правило 1: щитоносец выбивает игрока из блока,
+	// если игрок блокирует не щитом.
+	void OnBashLanded(RE::Actor* a_actor)
+	{
+		if (!a_actor || !IsWatchedBash(a_actor)) {
+			return;  // не наш заказ — ванильный AI, не вмешиваемся
+		}
+
+		const bool withShield = HasShield(a_actor);
+		logs::info("bandit anim: bashStart actor={} shield={}", a_actor->GetName(), withShield);
+		if (!withShield) {
+			return;
+		}
+
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		if (!player || !player->IsBlocking() || HasShield(player)) {
+			return;
+		}
+
+		g_pendingStaggers.push_back(Clock::now() +
+			std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kStaggerDelaySeconds)));
+	}
+
+	void ProcessPendingStaggers(Clock::time_point a_now)
+	{
+		for (auto it = g_pendingStaggers.begin(); it != g_pendingStaggers.end();) {
+			if (a_now < *it) {
+				++it;
+				continue;
+			}
+			const bool tooSoon = g_lastStagger.time_since_epoch().count() != 0 &&
+				std::chrono::duration<float>(a_now - g_lastStagger).count() < kStaggerCooldown;
+			if (!tooSoon) {
+				g_lastStagger = a_now;
+				CastStaggerOnPlayer("баш щитоносца, игрок блокирует без щита");
+			}
+			it = g_pendingStaggers.erase(it);
+		}
+	}
 
 	bool HasShield(RE::Actor* a_actor)
 	{
@@ -435,6 +590,11 @@ namespace
 		CloseExpiredBuffs(now);
 		CloseExpiredWatches(now);
 
+		if (!g_staggerSearched) {
+			InitStaggerSpell();
+		}
+		ProcessPendingStaggers(now);
+
 		if (!g_enabled.load(std::memory_order_relaxed)) {
 			return;
 		}
@@ -473,11 +633,13 @@ namespace
 
 	std::string PapyrusGetStats(RE::StaticFunctionTag*)
 	{
-		return std::format("ticks={} bashes={} powerWindows={} buffs={} enabled={}",
+		return std::format("ticks={} bashes={} powerWindows={} buffs={} staggers={} staggerSpell={} enabled={}",
 			g_ticks.load(std::memory_order_relaxed),
 			g_bashes.load(std::memory_order_relaxed),
 			g_powerWindows.load(std::memory_order_relaxed),
 			g_buffs.size(),
+			g_staggers.load(std::memory_order_relaxed),
+			g_staggerSpell ? g_staggerSpell->GetName() : "<нет>",
 			g_enabled.load(std::memory_order_relaxed));
 	}
 
