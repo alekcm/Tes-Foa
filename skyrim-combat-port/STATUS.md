@@ -7,9 +7,14 @@
 - Design/research: частично готово — есть общий боевой дизайн и enemy moveset design для 42 архетипов.
 - Признак блока игрока подтверждён в игре (22.11.2026): `TGCP_PlayerBlocking` = 1 по `blockStartOut`, = 0 по
   `blockStop`; в логе `player block start (blockStartOut)` / `player block stop (blockStop)`. Без SKSE.
-- С 0.1.3 в `TGCP_PlayerBlockWatcher` добавлен «финт»: при начале блока игрока ближайшему противнику
-  (в радиусе 250, в бою с игроком, с линией видимости) отправляется `Debug.SendAnimationEvent(target, "bashStart");
-  кулдаун 7 с. В игре ещё не проверялось; у функции есть документированный риск рассинхронизации анимации NPC.
+- **Отклонено пользователем (22.11.2026):** «финт» на ванильном `Debug.SendAnimationEvent(target, "bashStart")`
+  в `TGCP_PlayerBlockWatcher`. Пользователь выбрал путь **через SKSE**; код финта будет переписан нативно.
+  Сейчас этот код в скрипте есть, но считается непринятым и подлежит замене — в игре его не проверять.
+- **SKSE-часть начата:** `skyrim-combat-port/native/` — C++ плагин на CommonLibSSE-NG (xmake), собирается
+  в GitHub Actions (workflow `native`), артефакт `TGCombatPort-dll` = `TGCombatPort.dll`. Сборка проходит.
+  Что умеет сейчас: пишет строку в `Documents\My Games\Skyrim Special Edition\SKSE\TGCombatPort.log`
+  и регистрирует Papyrus-функцию `TGCP_Native.IsBlocking(Actor)` (точное чтение `Isblocking` из графа).
+  В игре **не проверялось**.
 - Implementation: частично — четыре Papyrus-скрипта **скомпилированы** настоящим PapyrusCompiler (0 ошибок, 0 предупреждений, 2026-11-21, runtime 1.7.104.0); записей в плагине нет.
 - Build: скрипты собраны (4 `.pex`); плагин `.esp` не собран, zip не собирался.
 - In-game test: **мод запускается и работает**. 22.11.2026, лог `Papyrus.0.log` (05:10:51–05:13:05),
