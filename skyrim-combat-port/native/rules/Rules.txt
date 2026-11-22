@@ -1,0 +1,137 @@
+# TGCombatPort — правила механики.
+# Файл ставится в Data\SKSE\Plugins\TGCombatPort\Rules.txt.
+# Плагин читает его при запуске игры и печатает в лог: "Rules.txt [...]: правил N".
+#
+# Каждая секция [имя] — одно правило. «Хочу, чтобы такая-то атака такого-то врага
+# делала то же самое» — это новая секция здесь, код менять не нужно.
+#
+# ── условия ────────────────────────────────────────────────────────────────────
+#   trigger         = hit, bash      hit — настоящее попадание; bash — наш заказанный баш
+#   hit-flags       = blocked, power, bash, sneak   (все перечисленные должны быть)
+#   hit-not-flags   = power          (ни одного из перечисленных быть не должно)
+#   attack.kind     = melee, ranged, spell, shout, unarmed, any
+#   attacker.race     = <раса>        например BearRace; список через запятую
+#   attacker.weapon   = mace, battleaxe, sword, … | any     (тип оружия в руках)
+#   attacker.shield   = yes | no | any
+#   hit.source      = <форма>        то, чем бьют: оружие, заклинание, крик (TESHitEvent::source)
+#   hit.projectile  = <форма>        снаряд: болт, стрела, файрбол (TESHitEvent::projectile)
+#   player.blocking = yes | no | any
+#   player.shield   = yes | no | any
+#   player.ward     = yes | no | any     поднят ли у игрока вард (Малый Оберег и др.)
+#   reach           = yes | no       проверять дистанцию fCombatBashReach
+#   cooldown        = секунды между срабатываниями правила
+#   chip            = сколько здоровья снимает эффект chip (по умолчанию 10)
+#   do              = unblock, stagger, bash   (порядок сохраняется)
+#
+# ── как записывать формы (раса, оружие, снаряд, заклинание) ────────────────────
+#   BearRace                — EditorID из Creation Kit (самый удобный способ)
+#   Skyrim.esm|0x131E9      — плагин и локальный FormID (не зависит от порядка загрузки)
+#   0x000131E9              — полный FormID как он есть в этой игре
+#   Значения для конкретного удара берутся из строки лога "hit: … race=… source=… projectile=…".
+#
+# ── эффекты ────────────────────────────────────────────────────────────────────
+#   unblock  — снять блок у игрока и удерживать снятым ~1 с
+#   stagger  — стаггер спеллом от имени бьющего (дезориентация)
+#   bash     — заказать бьющему баш
+#   chip     — снять N здоровья СКВОЗЬ блок (блок остаётся, оглушения нет)
+
+[bandit-bash-breaks-weapon-block]
+# Щитоносец выбивает из блока того, кто блокирует оружием или кулаками (правило 1).
+trigger = hit, bash
+hit-flags = blocked
+attacker.shield = yes
+player.blocking = yes
+player.shield = no
+do = unblock, stagger
+cooldown = 4
+
+[heavy-blunt-power-breaks-shield-block]
+# Щит пробивает только силовая атака булавы или двуручного молота (правило 2).
+trigger = hit
+hit-flags = blocked, power
+attacker.weapon = mace, battleaxe
+player.blocking = yes
+player.shield = yes
+do = unblock, stagger
+cooldown = 4
+
+# ── примеры, которые сейчас выключены (уберите # перед [ ] и ключами) ──────────
+
+# Удар медведя выбивает из равновесия любого, кто блокирует.
+# У существа нет оружия в руках, поэтому фильтр по оружию тут не ставится;
+# если нужно «только медведь», оставьте attacker.race.
+#[bear-paw-breaks-block]
+#trigger = hit
+#hit-flags = blocked
+#attacker.race = BearRace
+#player.blocking = yes
+#do = unblock, stagger
+#reach = no
+#cooldown = 4
+
+# Особый разрывной болт: фильтр по снаряду (projectile) или по источнику (source).
+# Точные формы — из строки лога "hit: … source=… projectile=…".
+#[explosive-bolt-breaks-block]
+#trigger = hit
+#hit-flags = blocked
+#hit.projectile = 0x00000000
+#player.blocking = yes
+#do = unblock, stagger
+#cooldown = 4
+
+# Особое заклинание: фильтр по форме заклинания.
+#[special-spell-breaks-block]
+#trigger = hit
+#hit-flags = blocked
+#attack.kind = spell
+#hit.source = 0x00000000
+#player.blocking = yes
+#do = unblock, stagger
+#cooldown = 4
+
+# Дыхание дракона приходит как крик (shout): фильтр по виду атаки и форме крика.
+#[dragon-breath-breaks-block]
+#trigger = hit
+#hit-flags = blocked
+#attack.kind = shout
+#attacker.race = DragonRace
+#player.blocking = yes
+#do = unblock, stagger
+#cooldown = 4
+
+# ── уколы: силовая атака кинжала и меча ────────────────────────────────────────
+# Включены: это механика «укол проходит сквозь блок, но не снимает его».
+
+[dagger-thrust-through-any-block]
+# Кинжал: укол юркий, проходит и блок оружием, и блок щитом (урон, без оглушения).
+trigger = hit
+hit-flags = blocked, power
+attacker.weapon = dagger
+player.blocking = yes
+do = chip
+chip = 10
+cooldown = 0
+
+[sword-thrust-through-weapon-block]
+# Меч: укол проходит блок оружием, но щит его останавливает.
+trigger = hit
+hit-flags = blocked, power
+attacker.weapon = sword
+player.blocking = yes
+player.shield = no
+do = chip
+chip = 8
+cooldown = 0
+
+# ── блок магией (вард) ────────────────────────────────────────────────────────
+# Включено: вард виден правилам. Молот его НЕ пробивает — правило ниже сознательно
+# отсутствует; снимать вард должна антимагия (эффект dispel появится отдельной задачей).
+[dagger-thrust-through-ward]
+# Кинжал проходит и сквозь оберег: магия останавливает заклинания, а не тонкий клинок.
+trigger = hit
+hit-flags = blocked, power
+attacker.weapon = dagger
+player.ward = yes
+do = chip
+chip = 6
+cooldown = 0

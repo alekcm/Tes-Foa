@@ -32,8 +32,13 @@ jobs:
           xmake-version: latest
           build-cache: false
 
+      # Коммит CommonLibSSE-NG закреплён: у свежего 16.11.0 сломана поставка prebuilt
+      # (нет extern/openvr/headers → fatal error: 'openvr.h' not found).
       - name: Clone CommonLibSSE-NG
-        run: git clone --depth 1 -b ng https://github.com/alandtse/CommonLibVR.git lib/commonlibsse-ng
+        run: |
+          git clone -q -b ng https://github.com/alandtse/CommonLibVR.git lib/commonlibsse-ng
+          cd lib/commonlibsse-ng
+          git checkout -q 48b17e1dea3028850adf63209f6733dbf4dcdcd7
 
       - name: Build
         shell: pwsh
@@ -47,15 +52,26 @@ jobs:
         if: failure()
         shell: pwsh
         run: |
-          $log = @(Get-Content build.log -ErrorAction SilentlyContinue)
-          if ($log.Count -eq 0) {
-            Write-Output "::error::build.log пуст или отсутствует"
-            exit 1
+          # Ошибки вытаскиваем аннотациями: логи Actions лежат на blob-хосте, который из песочницы
+          # агента недоступен, а annotations читаются через API.
+          $found = $false
+          foreach ($file in @('cfg.log', 'build.log')) {
+            $log = @(Get-Content $file -ErrorAction SilentlyContinue)
+            if ($log.Count -eq 0) { continue }
+            $found = $true
+            $errs = $log | Where-Object { $_ -match 'error|failed|fatal|cannot' } | Select-Object -Last 15
+            foreach ($line in $errs) {
+              $clean = ($line -replace "`r", "" -replace "`n", " ")
+              Write-Output ("::error::[" + $file + "] " + $clean)
+            }
+            $tail = $log | Select-Object -Last 5
+            foreach ($line in $tail) {
+              $clean = ($line -replace "`r", "" -replace "`n", " ")
+              Write-Output ("::error::[" + $file + " хвост] " + $clean)
+            }
           }
-          $errs = $log | Where-Object { $_ -match 'error|failed|fatal' } | Select-Object -Last 12
-          foreach ($line in $errs) {
-            $clean = ($line -replace "`r", "" -replace "`n", " ")
-            Write-Output ("::error::" + $clean)
+          if (-not $found) {
+            Write-Output "::error::логов сборки нет ни одного"
           }
 
       - name: Upload DLL
@@ -68,12 +84,55 @@ jobs:
       - name: Package for install
         shell: pwsh
         run: |
+          # Анимация укола — часть версии, а не «приложу отдельно». Поэтому:
+          #   1) до упаковки проверяем, что исходные клипы на месте;
+          #   2) после упаковки читаем готовый архив и падаем, если клипов в нём нет.
+          # Без этой проверки уже был случай: правило укола в версии есть, а клипа нет.
+          $ErrorActionPreference = 'Stop'
+          $animSource = 'assets/anim/meshes'
+          $animFiles = @(
+            'actors/character/animations/DynamicAnimationReplacer/_CustomConditions/90001/1hm_attackpowerfwd.hkx',
+            'actors/character/animations/DynamicAnimationReplacer/_CustomConditions/90001/_conditions.txt',
+            'actors/character/_1stperson/animations/DynamicAnimationReplacer/_CustomConditions/90001/1hm_attackpowerfwd.hkx',
+            'actors/character/_1stperson/animations/DynamicAnimationReplacer/_CustomConditions/90001/_conditions.txt'
+          )
+          if (-not (Test-Path $animSource)) {
+            throw "нет папки анимации $animSource (рабочий каталог $(Get-Location))"
+          }
+          foreach ($file in $animFiles) {
+            if (-not (Test-Path (Join-Path $animSource $file))) {
+              throw "нет файла анимации: $(Join-Path $animSource $file)"
+            }
+          }
+
           $name = "TGCombatPort-" + ($env:GITHUB_REF_NAME -replace '[/\\]', '-') + ".zip"
-          New-Item -ItemType Directory -Force -Path pkg/SKSE/Plugins | Out-Null
+          New-Item -ItemType Directory -Force -Path pkg/SKSE/Plugins/TGCombatPort | Out-Null
           Copy-Item build/windows/x64/release/TGCombatPort.dll pkg/SKSE/Plugins/
+          Copy-Item rules/Rules.txt pkg/SKSE/Plugins/TGCombatPort/
+          Copy-Item -Recurse $animSource pkg/
+          Write-Output "правила: $(Get-Content rules/Rules.txt | Measure-Object -Line | Select-Object -ExpandProperty Lines) строк"
           Compress-Archive -Path pkg/* -DestinationPath $name -Force
+          Write-Output ("размер архива: " + (Get-Item $name).Length + " байт")
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $name))
+          try {
+            $entries = @($archive.Entries | ForEach-Object { $_.FullName -replace '\\', '/' })
+            Write-Output ("::notice::файлов в архиве: " + $entries.Count)
+            # Печатаем только четыре нужных файла: GitHub обрезает заметки после десяти.
+            foreach ($file in $animFiles) {
+              $wanted = 'meshes/' + $file
+              if ($entries -notcontains $wanted) {
+                throw "в архиве нет $wanted — анимация укола не попала в версию"
+              }
+              $size = ($archive.Entries | Where-Object { ($_.FullName -replace '\\', '/') -eq $wanted }).Length
+              Write-Output ("::notice::анимация в архиве: " + $wanted + " (" + $size + " байт)")
+            }
+            Write-Output "проверка архива: анимация укола на месте (4 файла)"
+          } finally {
+            $archive.Dispose()
+          }
           "PKG_NAME=$name" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
-          Write-Output "собран архив $name"
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -85,11 +144,13 @@ jobs:
           $notes = @"
           SKSE-плагин TGCombatPort (часть мода). Проверка: DLL собран из ``skyrim-combat-port/native``.
 
-          Установка: распаковать архив в папку игры (появятся ``Data\SKSE\Plugins\TGCombatPort.dll``)
-          или установить zip через Vortex. Нужны SKSE64 2.3.1 (runtime 1.7.104) и Address Library v13.
+          Установка: распаковать архив в папку игры (появятся ``Data\SKSE\Plugins\TGCombatPort.dll``, ``Data\SKSE\Plugins\TGCombatPort\Rules.txt`` и папка анимаций ``Data\meshes\actors\character\…\DynamicAnimationReplacer`` для укола кинжалом/мечом; анимации требуют мода Dynamic Animation Replacer).
+
+          Проверка архива: шаг упаковки падает, если анимации укола нет внутри zip, и печатает полный список файлов архива в лог. Список файлов - в шаге «Package for install».
+          или установить zip через Vortex. Отдельный .dll не выкладываем: браузеры блокируют такое скачивание. Нужны SKSE64 2.3.1 (runtime 1.7.104) и Address Library v13.
           "@
           $notes | Out-File -Encoding utf8 notes.md
+          # Только архив: браузеры блокируют скачивание «голых» .dll.
           gh release create $env:TAG --title "TGCombatPort $env:TAG" --notes-file notes.md `
-            "build/windows/x64/release/TGCombatPort.dll" `
             "$env:PKG_NAME"
 

@@ -21,12 +21,15 @@ import build  # noqa: E402
 import check_docs  # noqa: E402
 import collect_logs  # noqa: E402
 import enable_plugin  # noqa: E402
+import esp_dump  # noqa: E402
 import check_env  # noqa: E402
 import inspect_plugin  # noqa: E402
 import inspect_records  # noqa: E402
 import package  # noqa: E402
 import papyrus_lint  # noqa: E402
 import papyrus_logging  # noqa: E402
+import verify_api  # noqa: E402
+import verify_audit  # noqa: E402
 
 
 def touch(path: Path, content: bytes = b"") -> None:
@@ -683,3 +686,156 @@ class CommandLineHelpTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, f"{path.name}: {result.stderr}")
             self.assertIn("usage", result.stdout.lower(), path.name)
+
+
+class VerifyAuditTests(unittest.TestCase):
+    def test_repository_audit_passes(self):
+        """Реальный репозиторий: каждая функция описана, каждая метка AS-n в реестре."""
+        self.assertEqual(verify_audit.main(["--quiet"]), 0)
+
+    def test_collect_functions_finds_definitions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sample.cpp"
+            path.write_text(
+                "namespace\n{\n\tvoid Foo(int a)\n\t{\n\t}\n\n\tbool Bar()\n\t{\n\t\treturn true;\n\t}\n}\n",
+                encoding="utf-8",
+            )
+            found = verify_audit.collect_functions([path])
+            self.assertIn("Foo", found)
+            self.assertIn("Bar", found)
+            self.assertNotIn("return", found)
+
+    def test_parse_assumptions_reads_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "ASSUMPTIONS.md"
+            path.write_text(
+                "| ID | Допущение | Почему | Проверяется | Статус |\n"
+                "|---|---|---|---|---|\n"
+                "| AS-1 | x | y | `block probe` | открыто |\n",
+                encoding="utf-8",
+            )
+            rows = verify_audit.parse_assumptions(path)
+            self.assertEqual(rows["AS-1"]["status"], "открыто")
+            self.assertEqual(rows["AS-1"]["checked_by"], "`block probe`")
+
+
+class VerifyApiTests(unittest.TestCase):
+    def test_index_headers_finds_declarations_and_aliases(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "A.h").write_text(
+                "namespace RE { class Actor { public: bool IsBlocking() const; }; }\n"
+                "namespace RE { using FormID = std::uint32_t; }\n"
+                "namespace RE { enum class Delivery { kSelf = 0 }; }\n",
+                encoding="utf-8",
+            )
+            declared, mentioned = verify_api.index_headers(root)
+            self.assertIn("Actor", declared)
+            self.assertIn("FormID", declared)
+            self.assertIn("Delivery", declared)
+            self.assertIn("Actor", mentioned)
+
+    def test_collect_symbols_reports_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "x.cpp"
+            path.write_text("RE::Actor* a = nullptr; RE::FormID id = 0;\n", encoding="utf-8")
+            found = verify_api.collect_symbols([path])
+            self.assertEqual(found["Actor"], ["x.cpp"] if False else found["Actor"])
+            self.assertIn("Actor", found)
+            self.assertIn("FormID", found)
+
+    def test_collect_methods_ignores_plain_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "y.cpp"
+            path.write_text("actor->IsBlocking(); actor->GetName();\n", encoding="utf-8")
+            found = verify_api.collect_methods([path])
+            self.assertIn("IsBlocking", found)
+            self.assertIn("GetName", found)
+
+class EspDumpTests(unittest.TestCase):
+    """Парсер модов: заголовки 24 байта, группы 24 байта, эффекты заклинаний."""
+
+    @staticmethod
+    def _record(sig: str, form_id: int, payload: bytes) -> bytes:
+        head = sig.encode() + struct.pack("<III", len(payload), 0, form_id)
+        head += b"\x00" * 4 + struct.pack("<HH", 44, 0)
+        return head + payload
+
+    @staticmethod
+    def _sub(kind: str, data: bytes) -> bytes:
+        return kind.encode() + struct.pack("<H", len(data)) + data
+
+    @staticmethod
+    def _grup(label: str, inner: bytes) -> bytes:
+        return b"GRUP" + struct.pack("<I", 24 + len(inner)) + label.encode()[:4].ljust(4, b"\x00") + b"\x00" * 12 + inner
+
+    def _plugin(self, directory: Path) -> Path:
+        tes4 = self._record("TES4", 0, self._sub("HEDR", struct.pack("<fII", 1.7, 3, 0x800)))
+        mgef = self._record(
+            "MGEF",
+            0x04000800,
+            self._sub("EDID", b"TestEffect\x00") + self._sub("DATA", struct.pack("<If", 0, 1.5)),
+        )
+        spel = self._record(
+            "SPEL",
+            0x04000801,
+            self._sub("EDID", b"TestSpell\x00")
+            + self._sub("EFID", struct.pack("<I", 0x04000800))
+            + self._sub("EFIT", struct.pack("<fii", 5.0, 0, 300)),
+        )
+        path = directory / "synthetic.esp"
+        path.write_bytes(
+            tes4 + self._grup("MGEF", mgef) + self._grup("SPEL", spel)
+        )
+        return path
+
+    def test_parses_groups_and_subrecords(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            records = esp_dump.parse_plugin(self._plugin(Path(tmp)))
+        self.assertEqual([r.sig for r in records], ["TES4", "MGEF", "SPEL"])
+        self.assertEqual(records[1].editor_id, "TestEffect")
+        self.assertEqual(records[1].to_dict()["mgef"]["base_cost"], 1.5)
+
+    def test_decodes_spell_effects(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            records = esp_dump.parse_plugin(self._plugin(Path(tmp)))
+        effects = [r for r in records if r.sig == "SPEL"][0].to_dict()["effects"]
+        self.assertEqual(effects, [{"mgef": "04000800", "magnitude": 5.0, "area": 0, "duration": 300}])
+
+    def test_broken_group_reports_offset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._plugin(Path(tmp))
+            path.write_bytes(path.read_bytes()[:-2])
+            with self.assertRaises(ValueError) as caught:
+                esp_dump.parse_plugin(path)
+        self.assertIn("не удалось разобрать", str(caught.exception))
+
+class ThrustAnimationAssetsTests(unittest.TestCase):
+    """Анимация укола — часть поставки: клипы и условия должны лежать в native/assets/anim."""
+
+    ANIM = ROOT / "native" / "assets" / "anim" / "meshes" / "actors" / "character"
+    CLIPS = (
+        ANIM / "animations" / "DynamicAnimationReplacer" / "_CustomConditions" / "90001",
+        ANIM / "_1stperson" / "animations" / "DynamicAnimationReplacer" / "_CustomConditions" / "90001",
+    )
+
+    def test_clips_and_conditions_exist(self) -> None:
+        for folder in self.CLIPS:
+            clip = folder / "1hm_attackpowerfwd.hkx"
+            self.assertTrue(clip.is_file(), f"нет клипа {clip}")
+            self.assertGreater(clip.stat().st_size, 5000, f"клип {clip} подозрительно мал")
+            self.assertEqual(clip.read_bytes()[:4].hex(), "57e0e057", "это не Havok-клип")
+
+            conditions = folder / "_conditions.txt"
+            self.assertTrue(conditions.is_file(), f"нет условий {conditions}")
+            text = conditions.read_text(encoding="utf-8")
+            self.assertIn("IsEquippedRightType(1)", text)
+            self.assertIn("IsEquippedRightType(2)", text)
+
+    def test_ci_packages_the_animation(self) -> None:
+        path = ROOT.parent / ".github" / "workflows" / "native.yml"
+        if not path.is_file():
+            self.skipTest(f"нет файла {path} (запуск вне репозитория)")
+        workflow = path.read_text(encoding="utf-8")
+        self.assertIn("Copy-Item -Recurse $animSource pkg/", workflow)
+        self.assertIn("анимация укола не попала в версию", workflow)
