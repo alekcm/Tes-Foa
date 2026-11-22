@@ -10,6 +10,10 @@ on:
       - "skyrim-combat-port/native/**"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   build:
     name: Build SKSE plugin
@@ -17,6 +21,7 @@ jobs:
     defaults:
       run:
         working-directory: skyrim-combat-port/native
+        shell: cmd
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,10 +33,11 @@ jobs:
           build-cache: false
 
       - name: Clone CommonLibSSE-NG
-        run: git clone --depth 1 -b ng https://github.com/alandtse/CommonLibVR.git lib/commonlibsse-ng
+        run: git clone --depth 1 -b ng https://github.com/alandtse/CommonLibVR.git lib\commonlibsse-ng
 
       - name: Build
-        run: xmake f -y -m release && xmake build -y
+        id: build
+        run: xmake f -y -m release > build.log 2>&1 && xmake build -y -v >> build.log 2>&1
 
       - name: Upload DLL
         uses: actions/upload-artifact@v4
@@ -39,3 +45,17 @@ jobs:
           name: TGCombatPort-dll
           path: skyrim-combat-port/native/build/windows/**/*.dll
           if-no-files-found: error
+
+      - name: Report build error
+        if: failure()
+        shell: pwsh
+        run: |
+          $log = "skyrim-combat-port/native/build.log"
+          if (Test-Path $log) {
+            $tail = Get-Content $log -Tail 120 -Encoding utf8 | Out-String
+            $body = "Сборка SKSE-плагина упала. Хвост лога:`n`n``````n" + $tail + "`n``````"
+            $body | Out-File -Encoding utf8 comment.md
+            gh issue comment 1 --body-file comment.md --repo $env:GITHUB_REPOSITORY
+          }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
