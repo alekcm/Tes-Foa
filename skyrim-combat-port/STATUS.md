@@ -70,6 +70,17 @@
   IsEquippedRightType(2)` (мечи и кинжалы; номера типов — из документации DAR в открытой
   реализации `noxsidereum/dargh`). Файлы и инструкция: [`native/assets/anim/`](native/assets/anim/README.md).
   Топор, булава и молот бьют по-прежнему. В игре **ещё не проверялось**.
+- **Разбор модов парсером (22.11.2026):** написан `tools/esp_dump.py` — читает ESP/ESM/ESL
+  (записи, группы, подзаписи, zlib), достаёт заклинания, эффекты, `GMST`, ключевые слова.
+  Две находки:
+  [`docs/reference/wildcat-analysis.md`](docs/reference/wildcat-analysis.md) — Wildcat действительно
+  делает ранения по частям (голова/рука/корпус/нога/спина, 300 с, «рука болит при атаке» = стаггер 0.5)
+  и переопределяет `GMST` (`fBlockMax 0.8`, `fBlockPowerAttackMult 0.5`…);
+  [`docs/reference/apocalypse-analysis.md`](docs/reference/apocalypse-analysis.md) — в Apocalypse 9.45
+  **404 заклинания**, из них **32 готовые NPC-версии** (20 Destruction, 12 Conjuration); там же —
+  решение, кому что давать (маг, некромант, нежить, лич, природный дух, босс).
+  Таблица «оружие → что пробивает → эффект»: [`docs/weapons-and-effects.md`](docs/weapons-and-effects.md).
+  Выдача заклинаний врагам **не реализована** — нужен код и проверка в игре (три открытых вопроса перечислены в документе по Apocalypse).
 - Implementation: частично — четыре Papyrus-скрипта **скомпилированы** настоящим PapyrusCompiler (0 ошибок, 0 предупреждений, 2026-11-21, runtime 1.7.104.0); записей в плагине нет.
 - Build: скрипты собраны (4 `.pex`); плагин `.esp` не собран, zip не собирался.
 - In-game test: **мод запускается и работает**. 22.11.2026, лог `Papyrus.0.log` (05:10:51–05:13:05),

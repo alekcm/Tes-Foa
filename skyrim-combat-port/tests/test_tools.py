@@ -21,6 +21,7 @@ import build  # noqa: E402
 import check_docs  # noqa: E402
 import collect_logs  # noqa: E402
 import enable_plugin  # noqa: E402
+import esp_dump  # noqa: E402
 import check_env  # noqa: E402
 import inspect_plugin  # noqa: E402
 import inspect_records  # noqa: E402
@@ -750,3 +751,61 @@ class VerifyApiTests(unittest.TestCase):
             found = verify_api.collect_methods([path])
             self.assertIn("IsBlocking", found)
             self.assertIn("GetName", found)
+
+class EspDumpTests(unittest.TestCase):
+    """Парсер модов: заголовки 24 байта, группы 24 байта, эффекты заклинаний."""
+
+    @staticmethod
+    def _record(sig: str, form_id: int, payload: bytes) -> bytes:
+        head = sig.encode() + struct.pack("<III", len(payload), 0, form_id)
+        head += b"\x00" * 4 + struct.pack("<HH", 44, 0)
+        return head + payload
+
+    @staticmethod
+    def _sub(kind: str, data: bytes) -> bytes:
+        return kind.encode() + struct.pack("<H", len(data)) + data
+
+    @staticmethod
+    def _grup(label: str, inner: bytes) -> bytes:
+        return b"GRUP" + struct.pack("<I", 24 + len(inner)) + label.encode()[:4].ljust(4, b"\x00") + b"\x00" * 12 + inner
+
+    def _plugin(self, directory: Path) -> Path:
+        tes4 = self._record("TES4", 0, self._sub("HEDR", struct.pack("<fII", 1.7, 3, 0x800)))
+        mgef = self._record(
+            "MGEF",
+            0x04000800,
+            self._sub("EDID", b"TestEffect\x00") + self._sub("DATA", struct.pack("<If", 0, 1.5)),
+        )
+        spel = self._record(
+            "SPEL",
+            0x04000801,
+            self._sub("EDID", b"TestSpell\x00")
+            + self._sub("EFID", struct.pack("<I", 0x04000800))
+            + self._sub("EFIT", struct.pack("<fii", 5.0, 0, 300)),
+        )
+        path = directory / "synthetic.esp"
+        path.write_bytes(
+            tes4 + self._grup("MGEF", mgef) + self._grup("SPEL", spel)
+        )
+        return path
+
+    def test_parses_groups_and_subrecords(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            records = esp_dump.parse_plugin(self._plugin(Path(tmp)))
+        self.assertEqual([r.sig for r in records], ["TES4", "MGEF", "SPEL"])
+        self.assertEqual(records[1].editor_id, "TestEffect")
+        self.assertEqual(records[1].to_dict()["mgef"]["base_cost"], 1.5)
+
+    def test_decodes_spell_effects(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            records = esp_dump.parse_plugin(self._plugin(Path(tmp)))
+        effects = [r for r in records if r.sig == "SPEL"][0].to_dict()["effects"]
+        self.assertEqual(effects, [{"mgef": "04000800", "magnitude": 5.0, "area": 0, "duration": 300}])
+
+    def test_broken_group_reports_offset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._plugin(Path(tmp))
+            path.write_bytes(path.read_bytes()[:-2])
+            with self.assertRaises(ValueError) as caught:
+                esp_dump.parse_plugin(path)
+        self.assertIn("не удалось разобрать", str(caught.exception))
