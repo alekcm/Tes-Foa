@@ -186,6 +186,11 @@ hk_2014 (Fallout 4) и нужна Java **[A: README]**; для Skyrim SE — Win
 кладём в `Data\meshes\actors\character\animations\` (при использовании OAR — в папку мода
 с условием «weapon type = dagger/sword + power attack»).
 
+Ванильные анимации в SE упакованы в `Data\Skyrim - Animations.bsa` (список базовых архивов SE:
+`Nexus-Mod-Manager`, `Game Modes/Definitions/SkyrimSE/skyrimse_base.txt`) **[A]**, поэтому файл
+сначала достаётся распаковщиком BSA. Пошаговая инструкция для пользователя —
+[`../assets/anim/README.md`](../assets/anim/README.md).
+
 ---
 
 ## 6. Травмы, кровотечение и части тела
