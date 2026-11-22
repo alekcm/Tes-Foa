@@ -3,7 +3,7 @@
 Здесь лежит C++ часть мода. Она нужна только для того, чего не умеет Papyrus:
 точное чтение состояния анимации и (в перспективе) управление действиями NPC.
 
-## Что уже есть (0.3.0)
+## Что уже есть (0.3.1)
 
 Хуков (патчинга кода игры) нет: версия 0.1.1 патчила `Actor::GetAttackChance` и вызывала вылет, способ убран.
 
@@ -55,10 +55,12 @@ xmake build
 
 Собранный плагин публикуется как GitHub Release по тегу `v*`:
 
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.3.0/TGCombatPort-v0.3.0.zip —
+- https://github.com/alekcm/Tes-Foa/releases/download/v0.3.1/TGCombatPort-v0.3.1.zip —
   архив с `SKSE/Plugins/TGCombatPort.dll`, распаковывается в папку `Data` игры
-  или ставится как обычный мод в Vortex;
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.3.0/TGCombatPort.dll — сам файл.
+  или ставится как обычный мод в Vortex.
+
+Отдельный `.dll` намеренно не выкладывается: браузеры (и SmartScreen) блокируют скачивание
+«голых» DLL, а из архива всё ставится без предупреждений.
 
 Почему не через `git pull`: в git лежат исходники; `.dll` — собранный Windows-бинарник, он
 собирается на сервере GitHub и выкладывается в Releases. Папка проекта на рабочем столе и
@@ -67,21 +69,21 @@ xmake build
 ## Проверка, что установилась нужная версия
 
 Первая строка лога `Documents\My Games\Skyrim Special Edition\SKSE\TGCombatPort.log` содержит версию
-плагина, например `TGCombatPort v0-3-0-0`. Если там старая версия — игра грузит старый файл:
+плагина, например `TGCombatPort v0-3-1-0`. Если там старая версия — игра грузит старый файл:
 
 - браузер мог сохранить новый файл как `TGCombatPort (1).dll`; проверьте оба пути
   (`dir "%USERPROFILE%\Downloads\TGCombatPort*.dll"`) и скопируйте нужный с переименованием;
 - если мод стоит в **Vortex**, он раскладывает файлы в `Data` сам при развёртывании и может вернуть
   старую версию поверх ручной копии. В этом случае ставить надо архив
-  (`TGCombatPort-v0.3.0.zip`) через Vortex → Install From File, а не копированием.
+  (`TGCombatPort-v0.3.1.zip`) через Vortex → Install From File, а не копированием.
 
 ## Установка (для проверки)
 
-1. Скачать `TGCombatPort-v0.3.0.zip` по ссылке выше (внутри DLL **и** обновлённые `.pex`).
+1. Скачать `TGCombatPort-v0.3.1.zip` по ссылке выше.
 2. Распаковать в папку `Data` игры (cmd):
 
 ```cmd
-tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.3.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
+tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.3.1.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
 ```
 
 3. Поставить **Address Library v13** (Nexus, мод 32444, файл для 1.6+) — без него DLL не загрузится.

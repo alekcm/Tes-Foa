@@ -86,10 +86,10 @@ jobs:
           SKSE-плагин TGCombatPort (часть мода). Проверка: DLL собран из ``skyrim-combat-port/native``.
 
           Установка: распаковать архив в папку игры (появятся ``Data\SKSE\Plugins\TGCombatPort.dll``)
-          или установить zip через Vortex. Нужны SKSE64 2.3.1 (runtime 1.7.104) и Address Library v13.
+          или установить zip через Vortex. Отдельный .dll не выкладываем: браузеры блокируют такое скачивание. Нужны SKSE64 2.3.1 (runtime 1.7.104) и Address Library v13.
           "@
           $notes | Out-File -Encoding utf8 notes.md
+          # Только архив: браузеры блокируют скачивание «голых» .dll.
           gh release create $env:TAG --title "TGCombatPort $env:TAG" --notes-file notes.md `
-            "build/windows/x64/release/TGCombatPort.dll" `
             "$env:PKG_NAME"
 
