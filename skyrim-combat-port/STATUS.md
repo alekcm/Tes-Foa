@@ -10,11 +10,14 @@
 - **Отклонено пользователем (22.11.2026):** «финт» на ванильном `Debug.SendAnimationEvent(target, "bashStart")`
   в `TGCP_PlayerBlockWatcher`. Пользователь выбрал путь **через SKSE**; код финта будет переписан нативно.
   Сейчас этот код в скрипте есть, но считается непринятым и подлежит замене — в игре его не проверять.
-- **SKSE-часть начата:** `skyrim-combat-port/native/` — C++ плагин на CommonLibSSE-NG (xmake), собирается
-  в GitHub Actions (workflow `native`), артефакт `TGCombatPort-dll` = `TGCombatPort.dll`. Сборка проходит.
-  Что умеет сейчас: пишет строку в `Documents\My Games\Skyrim Special Edition\SKSE\TGCombatPort.log`
-  и регистрирует Papyrus-функцию `TGCP_Native.IsBlocking(Actor)` (точное чтение `Isblocking` из графа).
-  В игре **не проверялось**.
+- **SKSE-часть работает:** `skyrim-combat-port/native/` — C++ плагин на CommonLibSSE-NG (xmake), собирается
+  в GitHub Actions (workflow `native`), публикуется в Releases. **Проверено в игре 22.11.2026:**
+  DLL загрузилась, лог `TGCombatPort.log` содержит `TGCombatPort native loaded, runtime 1.7.104.0`
+  и `TGCP_Native.IsBlocking зарегистрирована`.
+- **Механика бандита (0.1.1, в игре ещё не проверялась):** перехват `Actor::GetAttackChance`
+  (ID 49748 SE / 50675 AE) и подъём шанса bash-атаки, когда игрок держит блок, бандит со щитом в бою
+  и рядом (≤240), с кулдауном 7 с. Никаких `SendAnimationEvent`: анимацию и попадание считает игра.
+  Проверочные строки в логе: `hook installed`, `hook stats`, `bash candidate`, `bash boost`.
 - Implementation: частично — четыре Papyrus-скрипта **скомпилированы** настоящим PapyrusCompiler (0 ошибок, 0 предупреждений, 2026-11-21, runtime 1.7.104.0); записей в плагине нет.
 - Build: скрипты собраны (4 `.pex`); плагин `.esp` не собран, zip не собирался.
 - In-game test: **мод запускается и работает**. 22.11.2026, лог `Papyrus.0.log` (05:10:51–05:13:05),
