@@ -32,8 +32,13 @@ jobs:
           xmake-version: latest
           build-cache: false
 
+      # Коммит CommonLibSSE-NG закреплён: у свежего 16.11.0 сломана поставка prebuilt
+      # (нет extern/openvr/headers → fatal error: 'openvr.h' not found).
       - name: Clone CommonLibSSE-NG
-        run: git clone --depth 1 -b ng https://github.com/alandtse/CommonLibVR.git lib/commonlibsse-ng
+        run: |
+          git clone -q -b ng https://github.com/alandtse/CommonLibVR.git lib/commonlibsse-ng
+          cd lib/commonlibsse-ng
+          git checkout -q 48b17e1dea3028850adf63209f6733dbf4dcdcd7
 
       - name: Build
         shell: pwsh
