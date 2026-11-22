@@ -596,6 +596,46 @@ class InspectRecordsTests(unittest.TestCase):
             inspect_records.parse(b"NOT A PLUGIN AT ALL")
 
 
+    def test_game_dir_report_prints_real_text(self) -> None:
+        import contextlib
+        import io as string_io
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            game = root / "game"
+            scripts = game / "Data" / "Scripts"
+            scripts.mkdir(parents=True)
+            for name in inspect_records.PEX_NAMES:
+                touch(scripts / f"{name}.pex", b"PEX")
+            plugin = root / "TGCombatPort.esp"
+            plugin.write_bytes(build_plugin())
+            (game / "Data" / plugin.name).write_bytes(plugin.read_bytes())
+            plugins_txt = root / "plugins.txt"
+            plugins_txt.write_text("*TGCombatPort.esp\n", encoding="utf-8")
+
+            buffer = string_io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                code = inspect_records.main(
+                    [str(plugin), "--game-dir", str(game), "--plugins-txt", str(plugins_txt)]
+                )
+            output = buffer.getvalue()
+            self.assertEqual(code, 0, output)
+            self.assertNotIn("[ok] text", output)
+            self.assertIn("плагин TGCombatPort.esp лежит в Data игры", output)
+            self.assertIn("включён в plugins.txt", output)
+
+    def test_plugin_without_asterisk_is_reported_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            game = root / "game"
+            (game / "Data").mkdir(parents=True)
+            (game / "Data" / "TGCombatPort.esp").write_bytes(build_plugin())
+            plugins_txt = root / "plugins.txt"
+            plugins_txt.write_text("TGCombatPort.esp\n", encoding="utf-8")
+            checks = inspect_records.check_files(game, "TGCombatPort.esp", plugins_txt)
+            texts = [text for ok, text in checks if not ok]
+            self.assertTrue(any("ВЫКЛЮЧЕН" in text for text in texts), texts)
+
 class CommandLineHelpTests(unittest.TestCase):
     """Python 3.13+ падает на знаке % в тексте справки — проверяем все инструменты."""
 

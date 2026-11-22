@@ -222,13 +222,26 @@ def check_files(game_dir: Path, plugin_name: str, plugins_txt: Path | None) -> l
             result.append((False, f"файла plugins.txt нет: {plugins_txt}"))
         else:
             text = plugins_txt.read_text(encoding="utf-8", errors="replace")
-            entries = [
-                line.strip().lstrip("*").lower()
+            target = plugin_name.lower()
+            matched = [
+                line.strip()
                 for line in text.splitlines()
-                if line.strip() and not line.strip().startswith("#")
+                if line.strip() and not line.strip().startswith("#") and line.strip().lstrip("*").lower() == target
             ]
-            enabled = plugin_name.lower() in entries
-            result.append((enabled, f"плагин включён в plugins.txt"))
+            if not matched:
+                result.append((False, f"плагина {plugin_name} нет в plugins.txt — игра его не загрузит"))
+            else:
+                enabled = any(line.startswith("*") for line in matched)
+                if enabled:
+                    result.append((True, f"плагин включён в plugins.txt (строка {matched[0]})"))
+                else:
+                    result.append(
+                        (
+                            False,
+                            f"плагин есть в plugins.txt, но ВЫКЛЮЧЕН: строка {matched[0]!r} без звёздочки. "
+                            f"В Skyrim SE включённый плагин помечается звёздочкой в начале строки",
+                        )
+                    )
     return result
 
 
@@ -301,8 +314,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.game_dir:
         print(f"Проверка установки в {args.game_dir}:")
-        for ok, text in report["files"]:  # type: ignore[union-attr]
-            print(f"  [{'ok' if ok else 'нет'}] {text}")
+        for item in report["files"]:  # type: ignore[union-attr]
+            ok = bool(item["ok"])
+            print(f"  [{'ok' if ok else 'нет'}] {item['text']}")
             failed += 0 if ok else 1
 
     print()
