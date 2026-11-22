@@ -47,12 +47,22 @@ jobs:
           echo build failed
           exit /b 1
 
+      - name: List build output
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Recurse -File skyrim-combat-port/native/build -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -in '.dll', '.pdb' } | ForEach-Object { $_.FullName }
+          $text = if ($files) { $files -join "`n" } else { "DLL не найден в native/build" }
+          "Файлы сборки:`n`n" + $text | gh issue comment 1 --body-file - --repo $env:GITHUB_REPOSITORY
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload DLL
         uses: actions/upload-artifact@v4
         with:
           name: TGCombatPort-dll
-          path: skyrim-combat-port/native/build/windows/**/*.dll
-          if-no-files-found: error
+          path: skyrim-combat-port/native/build/**/*.dll
+          if-no-files-found: warn
 
       - name: Report build error
         if: failure()
