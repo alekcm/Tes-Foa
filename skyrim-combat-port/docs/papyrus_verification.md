@@ -15,6 +15,8 @@
 | `Spell.Cast(ObjectReference akSource, ObjectReference akTarget)` | CK Wiki: `Function Cast(ObjectReference akSource, ObjectReference akTarget = None)` | проигрывается ли анимация каста | оставить как fallback, не как основной путь |
 | `Actor.GetCombatTarget()`, `GetDistance()`, `IsDead()` | стандартные функции `Actor`/`ObjectReference` | — | — |
 | `GlobalVariable.SetValue(float)` | стандартная функция `GlobalVariable` | — | — |
+| `Game.FindClosestActorFromRef(ObjectReference, float)` | `Game` script: «Finds the closest Actor within a given radius of a ObjectReference» | находит ли врага, а не самого игрока | `Game.FindClosestActor(x,y,z,r)` или перебор через алиасы |
+| `Debug.SendAnimationEvent(ObjectReference, string)` | `Debug` script: `void SendAnimationEvent(ObjectReference arRef, string asEventName)`; CK Wiki: событие реально проигрывает действие («AttackStart» заставляет актёра атаковать). Предупреждение там же: отправка события актёру может рассинхронизировать его внутреннее состояние анимации | работает ли `bashStart` на NPC и не ломает ли его | не отправлять NPC, а только проигрывать эффект/звук; либо SKSE-DLL |
 | `Utility.GetCurrentRealTime()` | стандартная функция `Utility`, секунды реального времени | переживает ли сохранение/загрузку как ожидается | хранить время в глобале, если нужно пережить перезапуск |
 
 ## Что показал первый запуск в игре (22.11.2026)
