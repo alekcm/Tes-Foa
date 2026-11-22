@@ -35,8 +35,9 @@ namespace
 
 	// --- параметры механики (из docs/skyrim_enemy_combat_design_spec.md) ---
 	constexpr float kMeleeRadius = 240.0f;        // ближняя дистанция, игровые единицы
-	constexpr float kBashMultBoost = 10.0f;       // во что превращается bashMult на время окна
-	constexpr float kBashWindowSeconds = 1.5f;    // сколько держится окно
+	constexpr float kBashMultBoost = 10.0f;       // во что превращаются bash-множители на время окна
+	constexpr float kPowerAttackBlockingBoost = 10.0f;  // «бить силовой по блокирующему»
+	constexpr float kBashWindowSeconds = 2.5f;    // сколько держится окно
 	constexpr float kBashCooldownSeconds = 7.0f;  // «bash cooldown 7 s»
 
 	std::atomic_bool g_enabled{ true };
@@ -45,13 +46,50 @@ namespace
 	std::atomic<std::uint64_t> g_candidates{ 0 };
 	std::atomic<std::uint64_t> g_closeLogged{ 0 };
 
+	// Значения, которые берём у CombatStyle и обязаны вернуть как были.
+	struct SavedMults
+	{
+		float bash;
+		float bashRecoil;
+		float bashAttack;
+		float bashPowerAttack;
+		float powerAttackBlocking;
+	};
+
 	struct Window
 	{
 		RE::TESCombatStyle* style;
-		float               oldBashMult;
+		SavedMults          saved;
 		Clock::time_point   until;
-		RE::FormID          actor;
+		RE::ActorHandle     actor;
+		RE::FormID          actorID;
 	};
+
+	// Слушает animation events бандита, пока открыто окно: нужно, чтобы отличить
+	// «щитом бьёт» от «машет оружием».
+	class BanditGraphSink final : public RE::BSTEventSink<RE::BSAnimationGraphEvent>
+	{
+	public:
+		RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>*) override
+		{
+			if (!a_event || !a_event->tag.c_str()) {
+				return RE::BSEventNotifyControl::kContinue;
+			}
+
+			const std::string_view tag{ a_event->tag.c_str() };
+			if (tag != "bashStart"sv && tag != "bashStop"sv && tag != "bashRelease"sv &&
+				tag != "attackStart"sv && tag != "attackStop"sv && tag != "staggerStart"sv) {
+				return RE::BSEventNotifyControl::kContinue;
+			}
+
+			logs::info("bandit anim: {} ({})",
+				tag,
+				a_event->holder ? a_event->holder->GetName() : "?");
+			return RE::BSEventNotifyControl::kContinue;
+		}
+	};
+
+	BanditGraphSink g_banditSink;
 
 	std::vector<Window> g_openWindows;
 	std::unordered_map<RE::FormID, Clock::time_point> g_lastWindow;
@@ -81,7 +119,7 @@ namespace
 	bool HasOpenWindow(RE::FormID a_actor)
 	{
 		return std::any_of(g_openWindows.begin(), g_openWindows.end(),
-			[a_actor](const Window& w) { return w.actor == a_actor; });
+			[a_actor](const Window& w) { return w.actorID == a_actor; });
 	}
 
 	void CloseExpiredWindows(Clock::time_point a_now)
@@ -91,11 +129,21 @@ namespace
 				++it;
 				continue;
 			}
-			it->style->meleeData.bashMult = it->oldBashMult;
+			auto& melee = it->style->meleeData;
+			melee.bashMult = it->saved.bash;
+			melee.bashRecoilMult = it->saved.bashRecoil;
+			melee.bashAttackMult = it->saved.bashAttack;
+			melee.bashPowerAttackMult = it->saved.bashPowerAttack;
+			melee.powerAttackBlockingMult = it->saved.powerAttackBlocking;
+
+			if (auto actor = it->actor.get().get()) {
+				actor->RemoveAnimationGraphEventSink(&g_banditSink);
+			}
+
 			if (g_closeLogged.fetch_add(1, std::memory_order_relaxed) < 20) {
 				logs::info("bash window closed: style={:08X} bashMult -> {:.2f}",
 					it->style->GetFormID(),
-					it->oldBashMult);
+					it->saved.bash);
 			}
 			it = g_openWindows.erase(it);
 		}
@@ -148,17 +196,39 @@ namespace
 			return;
 		}
 
-		Window window{ style, style->meleeData.bashMult, a_now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kBashWindowSeconds)), actorID };
-		style->meleeData.bashMult = kBashMultBoost;
+		auto& melee = style->meleeData;
+		Window window{};
+		window.style = style;
+		window.saved = { melee.bashMult, melee.bashRecoilMult, melee.bashAttackMult, melee.bashPowerAttackMult, melee.powerAttackBlockingMult };
+		window.until = a_now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kBashWindowSeconds));
+		window.actor = a_actor->GetHandle();
+		window.actorID = actorID;
+
+		melee.bashMult = kBashMultBoost;
+		melee.bashRecoilMult = kBashMultBoost;
+		melee.bashAttackMult = kBashMultBoost;
+		melee.bashPowerAttackMult = kBashMultBoost;
+		melee.powerAttackBlockingMult = kPowerAttackBlockingBoost;
+
 		g_openWindows.push_back(window);
 		g_lastWindow[actorID] = a_now;
 		g_windows.fetch_add(1, std::memory_order_relaxed);
 
-		logs::info("bash window opened: actor={} style={:08X} bashMult {:.2f} -> {:.2f} dist={:.0f}",
+		if (a_actor->Is3DLoaded()) {
+			a_actor->AddAnimationGraphEventSink(&g_banditSink);
+		}
+
+		logs::info("bash window opened: actor={} style={:08X} bash {:.2f}->{:.2f} recoil {:.2f}->{:.2f} attack {:.2f}->{:.2f} powAtkBlock {:.2f}->{:.2f} dist={:.0f}",
 			a_actor->GetName(),
 			style->GetFormID(),
-			window.oldBashMult,
-			kBashMultBoost,
+			window.saved.bash,
+			melee.bashMult,
+			window.saved.bashRecoil,
+			melee.bashRecoilMult,
+			window.saved.bashAttack,
+			melee.bashAttackMult,
+			window.saved.powerAttackBlocking,
+			melee.powerAttackBlockingMult,
 			distance);
 	}
 
