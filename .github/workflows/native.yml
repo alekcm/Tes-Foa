@@ -2,9 +2,8 @@ name: native
 
 on:
   push:
-    paths:
-      - "skyrim-combat-port/native/**"
-      - ".github/workflows/native.yml"
+    branches:
+      - "**"
     tags:
       - "v*"
   pull_request:
