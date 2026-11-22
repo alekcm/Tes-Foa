@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import struct
 import sys
 import tempfile
@@ -593,3 +594,30 @@ class InspectRecordsTests(unittest.TestCase):
     def test_broken_file_is_rejected(self) -> None:
         with self.assertRaises(inspect_records.FormatError):
             inspect_records.parse(b"NOT A PLUGIN AT ALL")
+
+
+class CommandLineHelpTests(unittest.TestCase):
+    """Python 3.13+ падает на знаке % в тексте справки — проверяем все инструменты."""
+
+    def test_no_percent_in_help_strings(self) -> None:
+        pattern = re.compile(r'help="[^"]*%[^"]*"')
+        offenders = []
+        for path in sorted((ROOT / "tools").glob("*.py")):
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                if pattern.search(line):
+                    offenders.append(f"{path.name}:{number}")
+        self.assertEqual(offenders, [], "в help= нельзя использовать % (argparse принимает его за формат)")
+
+    def test_every_tool_shows_help(self) -> None:
+        import subprocess
+
+        for path in sorted((ROOT / "tools").glob("*.py")):
+            result = subprocess.run(
+                [sys.executable, str(path), "--help"],
+                capture_output=True,
+                text=True,
+                cwd=ROOT,
+                timeout=60,
+            )
+            self.assertEqual(result.returncode, 0, f"{path.name}: {result.stderr}")
+            self.assertIn("usage", result.stdout.lower(), path.name)

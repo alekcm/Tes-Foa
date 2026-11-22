@@ -245,7 +245,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Показать записи .esp и проверить сборку мода.")
     parser.add_argument("plugin", help="путь к .esp")
     parser.add_argument("--game-dir", help="папка игры, чтобы проверить Data\\Scripts и plugins.txt")
-    parser.add_argument("--plugins-txt", help="путь к plugins.txt (по умолчанию — %LOCALAPPDATA%)")
+    parser.add_argument("--plugins-txt", help="путь к plugins.txt (по умолчанию берётся из папки LOCALAPPDATA)")
     parser.add_argument("--json", action="store_true", help="вывод в JSON")
     args = parser.parse_args(argv)
 
