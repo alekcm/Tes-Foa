@@ -41,7 +41,34 @@ namespace
 	std::atomic<std::uint64_t> g_bashes{ 0 };
 	std::atomic<std::uint64_t> g_powerWindows{ 0 };
 	std::atomic<std::uint64_t> g_rejectLogged{ 0 };
-	std::atomic<std::uint64_t> g_orderedFailed{ 0 };
+
+	// Слушает animation events бандита, которому только что заказали баш: подтверждение,
+	// что замах реально проигрался.
+	class BashWatchSink final : public RE::BSTEventSink<RE::BSAnimationGraphEvent>
+	{
+	public:
+		RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>*) override
+		{
+			if (!a_event || !a_event->tag.c_str()) {
+				return RE::BSEventNotifyControl::kContinue;
+			}
+			const std::string_view tag{ a_event->tag.c_str() };
+			if (tag == "bashStart"sv || tag == "bashStop"sv || tag == "bashRelease"sv) {
+				logs::info("bandit anim: {} ({})", tag, a_event->holder ? a_event->holder->GetName() : "?");
+			}
+			return RE::BSEventNotifyControl::kContinue;
+		}
+	};
+
+	BashWatchSink g_bashSink;
+
+	struct Watch
+	{
+		RE::ActorHandle   actor;
+		Clock::time_point until;
+	};
+
+	std::vector<Watch> g_watches;
 
 	struct Buff
 	{
@@ -52,7 +79,15 @@ namespace
 	};
 
 	std::vector<Buff> g_buffs;
-	std::unordered_map<RE::FormID, Clock::time_point> g_lastBash;
+	// Попытки заказа баша: одна попытка не чаще 0,4 с, кулдаун 7 с — только после успеха.
+	struct AttemptState
+	{
+		Clock::time_point lastTry{};
+		int               fails{ 0 };
+		Clock::time_point blockUntil{};
+	};
+
+	std::unordered_map<RE::FormID, AttemptState> g_attempts;
 	std::unordered_map<RE::FormID, std::vector<std::string>> g_bashEventsByRace;
 	std::atomic<std::uint64_t> g_dumpedRaces{ 0 };
 	std::unordered_map<RE::FormID, Clock::time_point> g_lastPower;
@@ -166,6 +201,20 @@ namespace
 		return std::chrono::duration<float>(a_now - it->second).count() >= kCooldownSeconds;
 	}
 
+	void CloseExpiredWatches(Clock::time_point a_now)
+	{
+		for (auto it = g_watches.begin(); it != g_watches.end();) {
+			if (a_now < it->until) {
+				++it;
+				continue;
+			}
+			if (auto actor = it->actor.get().get()) {
+				actor->RemoveAnimationGraphEventSink(&g_bashSink);
+			}
+			it = g_watches.erase(it);
+		}
+	}
+
 	void CloseExpiredBuffs(Clock::time_point a_now)
 	{
 		for (auto it = g_buffs.begin(); it != g_buffs.end();) {
@@ -185,20 +234,21 @@ namespace
 	void OrderBash(RE::Actor* a_actor, float a_distance, Clock::time_point a_now)
 	{
 		const auto actorID = a_actor->GetFormID();
-		if (!CooldownPassed(g_lastBash, actorID, a_now)) {
+		auto& state = g_attempts[actorID];
+
+		if (a_now < state.blockUntil) {
 			return;
 		}
-		if (a_actor->IsAttacking()) {
+		if (state.lastTry.time_since_epoch().count() != 0 &&
+			std::chrono::duration<float>(a_now - state.lastTry).count() < 0.4f) {
+			return;  // не спамим граф
+		}
+		if (a_actor->IsAttacking() || !a_actor->Is3DLoaded()) {
 			return;  // не перебиваем начатую атаку
 		}
-		if (!a_actor->Is3DLoaded()) {
-			return;
-		}
 
-		g_lastBash[actorID] = a_now;
-		g_bashes.fetch_add(1, std::memory_order_relaxed);
+		state.lastTry = a_now;
 
-		// Какое из имён примет граф — заранее неизвестно, поэтому перебираем и пишем результат.
 		const auto& names = GetBashEventNames(a_actor);
 		std::string used;
 		for (const auto& name : names) {
@@ -209,21 +259,36 @@ namespace
 		}
 
 		if (used.empty()) {
-			std::string tried;
-			for (const auto& name : names) {
-				tried += (tried.empty() ? "" : ", ") + name;
+			++state.fails;
+			if (state.fails >= 12) {
+				state.fails = 0;
+				state.blockUntil = a_now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kCooldownSeconds));
+				std::string tried;
+				for (const auto& name : names) {
+					tried += (tried.empty() ? "" : ", ") + name;
+				}
+				logs::info("bash ordered: actor={} граф 12 раз не принял ни одно имя [{}], пауза {:.0f} c",
+					a_actor->GetName(),
+					tried,
+					kCooldownSeconds);
 			}
-			logs::info("bash ordered: actor={} dist={:.0f} НЕ ПРИНЯТО ни одно имя [{}] (игрок блокирует без щита)",
-				a_actor->GetName(),
-				a_distance,
-				tried);
-			g_orderedFailed.fetch_add(1, std::memory_order_relaxed);
-		} else {
-			logs::info("bash ordered: actor={} dist={:.0f} event={} sent=true (игрок блокирует без щита)",
-				a_actor->GetName(),
-				a_distance,
-				used);
+			return;
 		}
+
+		state.fails = 0;
+		state.blockUntil = a_now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kCooldownSeconds));
+		g_bashes.fetch_add(1, std::memory_order_relaxed);
+
+		if (std::none_of(g_watches.begin(), g_watches.end(),
+				[&](const Watch& w) { return w.actor.get().get() == a_actor; })) {
+			a_actor->AddAnimationGraphEventSink(&g_bashSink);
+			g_watches.push_back(Watch{ a_actor->GetHandle(), a_now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(3.0f)) });
+		}
+
+		logs::info("bash ordered: actor={} dist={:.0f} event={} sent=true (игрок блокирует без щита)",
+			a_actor->GetName(),
+			a_distance,
+			used);
 	}
 
 	// Правило 2: щит пробивается силовой атакой булавы/двуручного молота.
@@ -311,6 +376,7 @@ namespace
 
 		const auto now = Clock::now();
 		CloseExpiredBuffs(now);
+		CloseExpiredWatches(now);
 
 		if (!g_enabled.load(std::memory_order_relaxed)) {
 			return;
