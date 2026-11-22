@@ -22,6 +22,7 @@ import collect_logs  # noqa: E402
 import enable_plugin  # noqa: E402
 import check_env  # noqa: E402
 import inspect_plugin  # noqa: E402
+import inspect_records  # noqa: E402
 import package  # noqa: E402
 import papyrus_lint  # noqa: E402
 import papyrus_logging  # noqa: E402
@@ -517,3 +518,78 @@ class PapyrusLoggingTests(unittest.TestCase):
             )
             self.assertEqual(len(papyrus_logging.find_inis(documents_dirs)), 2)
             self.assertIsNone(papyrus_logging.resolve_target(None, documents_dirs, create=False))
+
+
+def esp_record(record_type: str, form_id: int, payload: bytes, compressed: bool = False) -> bytes:
+    body = zlib.compress(payload) if compressed else payload
+    flags = inspect_records.COMPRESSED_FLAG if compressed else 0
+    header = struct.pack("<4sIII", record_type.encode(), len(body), flags, form_id)
+    return header + struct.pack("<IHH", 0, 44, 0) + body
+
+
+def esp_sub(name: str, data: bytes) -> bytes:
+    return name.encode() + struct.pack("<H", len(data)) + data
+
+
+def esp_group(label: bytes, children: bytes) -> bytes:
+    return b"GRUP" + struct.pack("<I", 24 + len(children)) + label + struct.pack("<IHHI", 0, 0, 0, 0) + children
+
+
+def build_plugin(
+    global_edid: str = "TGCP_PlayerBlocking",
+    quest_edid: str = "TGCP_MainQuest",
+    scripts: tuple[str, ...] = ("TGCP_PlayerBlockWatcher", "TGCP_AnimEventProbe"),
+    start_game: bool = True,
+) -> bytes:
+    tes4 = esp_record(
+        "TES4",
+        0,
+        esp_sub("HEDR", struct.pack("<fII", 1.7, 1, 0x800)) + esp_sub("MAST", b"Skyrim.esm\x00"),
+    )
+    glob = esp_record(
+        "GLOB",
+        0x800,
+        esp_sub("EDID", global_edid.encode() + b"\x00") + esp_sub("FNAM", b"s") + esp_sub("DATA", struct.pack("<f", 0.0)),
+    )
+    vmad = b"".join(
+        struct.pack("<H", len(name)) + name.encode() + b"\x00\x00\x00" for name in scripts
+    ) + struct.pack("<H", len(b"PlayerBlocking")) + b"PlayerBlocking"
+    qust_payload = (
+        esp_sub("EDID", quest_edid.encode() + b"\x00")
+        + esp_sub("VMAD", vmad)
+        + esp_sub("DNAM", bytes([1 if start_game else 0]) + bytes(11))
+        + esp_sub("ALID", b"PlayerAlias\x00")
+    )
+    qust = esp_record("QUST", 0x801, qust_payload, compressed=True)
+    return tes4 + esp_group(b"GLOB", glob) + esp_group(b"QUST", qust)
+
+
+class InspectRecordsTests(unittest.TestCase):
+    def test_reads_records_and_masters(self) -> None:
+        data = build_plugin()
+        nodes = inspect_records.parse(data)
+        types = [node["type"] for node in nodes]
+        self.assertEqual(types, ["TES4", "GLOB", "QUST"])
+        self.assertEqual(inspect_records.masters_of(data), ["Skyrim.esm"])
+
+    def test_check_passes_on_complete_plugin(self) -> None:
+        ok, failed = 0, 0
+        for result, _ in inspect_records.check(build_plugin()):
+            ok += result
+            failed += not result
+        self.assertEqual(failed, 0)
+        self.assertGreater(ok, 4)
+
+    def test_missing_alias_script_is_reported(self) -> None:
+        checks = dict((text, good) for good, text in inspect_records.check(build_plugin(scripts=("TGCP_PlayerBlockWatcher",))))
+        probe = [good for text, good in checks.items() if "TGCP_AnimEventProbe" in text]
+        self.assertEqual(probe, [False])
+
+    def test_start_game_enabled_is_read(self) -> None:
+        data = build_plugin(start_game=False)
+        texts = [text for good, text in inspect_records.check(data) if not good]
+        self.assertTrue(any("Start Game Enabled" in text for text in texts))
+
+    def test_broken_file_is_rejected(self) -> None:
+        with self.assertRaises(inspect_records.FormatError):
+            inspect_records.parse(b"NOT A PLUGIN AT ALL")
