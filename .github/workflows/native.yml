@@ -37,7 +37,15 @@ jobs:
 
       - name: Build
         id: build
-        run: xmake f -y -m release > build.log 2>&1 && xmake build -y -v >> build.log 2>&1
+        run: |
+          xmake f -y -m release > build.log 2>&1
+          if errorlevel 1 goto :report
+          xmake build -y -v >> build.log 2>&1
+          if errorlevel 1 goto :report
+          exit /b 0
+          :report
+          echo build failed
+          exit /b 1
 
       - name: Upload DLL
         uses: actions/upload-artifact@v4
@@ -56,6 +64,8 @@ jobs:
             $body = "Сборка SKSE-плагина упала. Хвост лога:`n`n``````n" + $tail + "`n``````"
             $body | Out-File -Encoding utf8 comment.md
             gh issue comment 1 --body-file comment.md --repo $env:GITHUB_REPOSITORY
+          } else {
+            "build.log не появился — xmake не дошёл до вывода" | gh issue comment 1 --body-file - --repo $env:GITHUB_REPOSITORY
           }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
