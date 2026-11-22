@@ -70,6 +70,22 @@
 `blockStartOut`, концом — `blockStop`. Имя сработавшего события пишется в лог, поэтому следующий прогон
 покажет, какое именно работает.
 
+### Третий прогон (22.11.2026, 05:25:45–05:25:57, watcher v2)
+
+Подтверждено в игре, что признак блока работает:
+
+```
+05:25:51  [TGCP] player block start (blockStartOut)
+05:25:54  [TGCP] player block stop (blockStop)
+05:25:55  [TGCP] player block start (blockStartOut)
+05:25:56  [TGCP] player block stop (blockStop)
+05:25:56  [TGCP] player block start (blockStartOut)   ← bash прервал блок, новый блок начался сразу
+05:25:57  [TGCP] player block stop (blockStop)
+```
+
+То есть `TGCP_PlayerBlocking` меняется 1/0 по блоку игрока. Технический вопрос «можно ли узнать, что игрок
+блокирует» закрыт: можно, без SKSE, по `blockStartOut` + `blockStop`.
+
 Открытый вопрос: почему `attackStart`/`bashStart`/`staggerStart` не приходят, хотя `*Stop` и `blockStartOut`
 приходят. Тест проводился **не в бою** (игрок махал в воздух). Возможная причина — другая ветка графа
 анимаций в бою; это проверяется только боем с NPC.
