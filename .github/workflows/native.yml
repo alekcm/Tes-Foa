@@ -87,8 +87,8 @@ jobs:
           $name = "TGCombatPort-" + ($env:GITHUB_REF_NAME -replace '[/\\]', '-') + ".zip"
           New-Item -ItemType Directory -Force -Path pkg/SKSE/Plugins/TGCombatPort | Out-Null
           Copy-Item build/windows/x64/release/TGCombatPort.dll pkg/SKSE/Plugins/
-          Copy-Item skyrim-combat-port/native/rules/Rules.txt pkg/SKSE/Plugins/TGCombatPort/
-          Write-Output "правила: $(Get-Content skyrim-combat-port/native/rules/Rules.txt | Measure-Object -Line | Select-Object -ExpandProperty Lines) строк"
+          Copy-Item rules/Rules.txt pkg/SKSE/Plugins/TGCombatPort/
+          Write-Output "правила: $(Get-Content rules/Rules.txt | Measure-Object -Line | Select-Object -ExpandProperty Lines) строк"
           Compress-Archive -Path pkg/* -DestinationPath $name -Force
           "PKG_NAME=$name" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
           Write-Output "собран архив $name"
