@@ -11,10 +11,16 @@
 #   hit-not-flags   = power          (ни одного из перечисленных быть не должно)
 #   attack.kind     = melee, ranged, spell, shout, unarmed, any
 #   attacker.race     = <раса>        например BearRace; список через запятую
-#   attacker.weapon   = mace, battleaxe, sword, … | any     (тип оружия в руках)
+#   attacker.weapon   = fists, sword, dagger, axe, mace, greatsword, battleaxe, bow, staff,
+#                       crossbow | any
+#                       Внимание: «battleaxe» — это весь двуручный тип движка (kTwoHandAxe),
+#                       то есть И топор, И молот. Отдельного «warhammer» пока нет: чтобы
+#                       различать их, нужен признак по кейворду WeapTypeWarhammer (задача в коде).
 #   attacker.shield   = yes | no | any
 #   hit.source      = <форма>        то, чем бьют: оружие, заклинание, крик (TESHitEvent::source)
 #   hit.projectile  = <форма>        снаряд: болт, стрела, файрбол (TESHitEvent::projectile)
+#                       «any»/«none» (есть снаряд / магия без снаряда) пока НЕ поддерживаются —
+#                       это следующая правка кода, см. задачу «магия: снаряд против AoE».
 #   player.blocking = yes | no | any
 #   player.shield   = yes | no | any
 #   player.ward     = yes | no | any     поднят ли у игрока вард (Малый Оберег и др.)
@@ -34,76 +40,44 @@
 #   stagger  — стаггер спеллом от имени бьющего (дезориентация)
 #   bash     — заказать бьющему баш
 #   chip     — снять N здоровья СКВОЗЬ блок (блок остаётся, оглушения нет)
+#
+# ── что решено 22.11.2026 (правки пользователя) ────────────────────────────────
+#   * одноручный топор НЕ оглушает и блок оружием НЕ пробивает;
+#   * двуручный топор НЕ оглушает, блок не пробивает, но может нанести травму
+#     (эффект wound — в коде ещё нет);
+#   * двуручный меч на зажатие — широкий выпад по площади, большой урон без эффектов,
+#     поэтому блок оружием он НЕ пробивает;
+#   * обычное двуручное у противников не оглушает и блок не пробивает;
+#   * щит дезориентирует только того, кто НЕ блокирует; сквозь блок оружием щит
+#     не пробивает и блок не снимает;
+#   * лук и арбалет простреливают блок оружием насквозь, щит их держит;
+#   * вся магия проходит сквозь блок оружием; снаряд гасится щитом, AoE (столб,
+#     поток, разряд без снаряда) пробивает и щит.
 
-[bandit-bash-breaks-weapon-block]
-# Щитоносец выбивает из блока того, кто блокирует оружием или кулаками (правило 1).
+[shield-bash-staggers-unblocked]
+# Щит дезориентирует только того, у кого нет блока вообще.
+# Если игрок блокирует оружием — щит не пробивает и блок не снимает: правила на этот
+# случай СОЗНАТЕЛЬНО НЕТ.
 trigger = hit, bash
-hit-flags = blocked
-attacker.shield = yes
-player.blocking = yes
-player.shield = no
-do = unblock, stagger
-cooldown = 4
+player.blocking = no
+do = stagger
+cooldown = 3
 
-[heavy-blunt-power-breaks-shield-block]
-# Щит пробивает только силовая атака булавы или двуручного молота (правило 2).
+[onehand-mace-power-breaks-shield-block]
+# Щит игрока пробивает силовая атака булавы. Двуручное сюда не входит:
+# обычное двуручное у противников не пробивает (решение 22.11.2026).
 trigger = hit
 hit-flags = blocked, power
-attacker.weapon = mace, battleaxe
+attacker.weapon = mace
 player.blocking = yes
 player.shield = yes
 do = unblock, stagger
 cooldown = 4
 
-# ── примеры, которые сейчас выключены (уберите # перед [ ] и ключами) ──────────
-
-# Удар медведя выбивает из равновесия любого, кто блокирует.
-# У существа нет оружия в руках, поэтому фильтр по оружию тут не ставится;
-# если нужно «только медведь», оставьте attacker.race.
-#[bear-paw-breaks-block]
-#trigger = hit
-#hit-flags = blocked
-#attacker.race = BearRace
-#player.blocking = yes
-#do = unblock, stagger
-#reach = no
-#cooldown = 4
-
-# Особый разрывной болт: фильтр по снаряду (projectile) или по источнику (source).
-# Точные формы — из строки лога "hit: … source=… projectile=…".
-#[explosive-bolt-breaks-block]
-#trigger = hit
-#hit-flags = blocked
-#hit.projectile = 0x00000000
-#player.blocking = yes
-#do = unblock, stagger
-#cooldown = 4
-
-# Особое заклинание: фильтр по форме заклинания.
-#[special-spell-breaks-block]
-#trigger = hit
-#hit-flags = blocked
-#attack.kind = spell
-#hit.source = 0x00000000
-#player.blocking = yes
-#do = unblock, stagger
-#cooldown = 4
-
-# Дыхание дракона приходит как крик (shout): фильтр по виду атаки и форме крика.
-#[dragon-breath-breaks-block]
-#trigger = hit
-#hit-flags = blocked
-#attack.kind = shout
-#attacker.race = DragonRace
-#player.blocking = yes
-#do = unblock, stagger
-#cooldown = 4
-
 # ── уколы: силовая атака кинжала и меча ────────────────────────────────────────
-# Включены: это механика «укол проходит сквозь блок, но не снимает его».
 
 [dagger-thrust-through-any-block]
-# Кинжал: укол юркий, проходит и блок оружием, и блок щитом (урон, без оглушения).
+# Кинжал: укол проходит и блок оружием, и блок щитом (урон, без оглушения).
 trigger = hit
 hit-flags = blocked, power
 attacker.weapon = dagger
@@ -123,9 +97,6 @@ do = chip
 chip = 8
 cooldown = 0
 
-# ── блок магией (вард) ────────────────────────────────────────────────────────
-# Включено: вард виден правилам. Молот его НЕ пробивает — правило ниже сознательно
-# отсутствует; снимать вард должна антимагия (эффект dispel появится отдельной задачей).
 [dagger-thrust-through-ward]
 # Кинжал проходит и сквозь оберег: магия останавливает заклинания, а не тонкий клинок.
 trigger = hit
@@ -135,3 +106,72 @@ player.ward = yes
 do = chip
 chip = 6
 cooldown = 0
+
+# ── стрельба ─────────────────────────────────────────────────────────────────
+
+[arrow-and-bolt-through-weapon-block]
+# Лук и арбалет простреливают блок оружием насквозь. Щит держит: player.shield = no.
+trigger = hit
+hit-flags = blocked
+attack.kind = ranged
+attacker.weapon = bow, crossbow
+player.blocking = yes
+player.shield = no
+do = chip
+chip = 8
+cooldown = 0
+
+# ── магия ────────────────────────────────────────────────────────────────────
+
+[spell-through-weapon-block]
+# Вся магия проходит сквозь блок оружием; вард её гасит, поэтому player.ward = no.
+trigger = hit
+hit-flags = blocked
+attack.kind = spell
+player.blocking = yes
+player.shield = no
+player.ward = no
+do = chip
+chip = 6
+cooldown = 0
+
+# ── выключено: ждёт правки кода ───────────────────────────────────────────────
+#
+# 1) «Снаряд гасится щитом, AoE пробивает щит».
+#    Нужны значения hit.projectile = any (есть снаряд) и none (магия без снаряда).
+#    После этого включаются два правила:
+#
+#    [spell-projectile-stopped-by-shield]     # снаряд: щит держит → ничего не делаем
+#    [spell-aoe-breaks-shield]                # AoE: пробивает щит
+#    trigger = hit
+#    hit-flags = blocked
+#    attack.kind = spell
+#    player.blocking = yes
+#    player.shield = yes
+#    hit.projectile = none
+#    do = chip
+#    chip = 8
+#    cooldown = 0
+#
+# 2) «Двуручный молот пробивает щит, двуручный топор — нет».
+#    Сейчас оба приходят как battleaxe (kTwoHandAxe), различить нечем.
+#    Нужен признак по кейворду WeapTypeWarhammer в коде, затем включается:
+#
+#    [twohand-warhammer-breaks-shield-block]
+#    trigger = hit
+#    hit-flags = blocked, power
+#    attacker.weapon = warhammer
+#    player.blocking = yes
+#    player.shield = yes
+#    do = unblock, stagger
+#    cooldown = 4
+#
+# 3) «Двуручный топор наносит травму, но не оглушает».
+#    Нужен эффект wound (ранения по частям тела), его пока нет:
+#
+#    [twohand-axe-wounds]
+#    trigger = hit
+#    hit-flags = blocked, power
+#    attacker.weapon = battleaxe
+#    do = wound
+#    cooldown = 8

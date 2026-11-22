@@ -23,6 +23,7 @@ import collect_logs  # noqa: E402
 import enable_plugin  # noqa: E402
 import esp_dump  # noqa: E402
 import check_env  # noqa: E402
+import check_rules  # noqa: E402
 import inspect_plugin  # noqa: E402
 import inspect_records  # noqa: E402
 import package  # noqa: E402
@@ -839,3 +840,25 @@ class ThrustAnimationAssetsTests(unittest.TestCase):
         workflow = path.read_text(encoding="utf-8")
         self.assertIn("Copy-Item -Recurse $animSource pkg/", workflow)
         self.assertIn("анимация укола не попала в версию", workflow)
+
+class RulesFileTests(unittest.TestCase):
+    """Опечатка в правиле = правило молча выключится в игре, поэтому проверяем здесь."""
+
+    def test_repository_rules_are_valid(self) -> None:
+        text = (ROOT / "native" / "rules" / "Rules.txt").read_text(encoding="utf-8")
+        problems, names = check_rules.check_text(text)
+        self.assertEqual(problems, [])
+        self.assertIn("arrow-and-bolt-through-weapon-block", names)
+        self.assertIn("spell-through-weapon-block", names)
+
+    def test_unknown_weapon_is_reported(self) -> None:
+        problems, _ = check_rules.check_text("[x]\nattacker.weapon = warhammer\n")
+        self.assertTrue(any("warhammer" in problem for problem in problems))
+
+    def test_unknown_key_is_reported(self) -> None:
+        problems, _ = check_rules.check_text("[x]\nplayer.blokcing = yes\n")
+        self.assertTrue(any("неизвестный ключ" in problem for problem in problems))
+
+    def test_bad_tri_state_is_reported(self) -> None:
+        problems, _ = check_rules.check_text("[x]\nplayer.shield = maybe\n")
+        self.assertTrue(any("yes/no/any" in problem for problem in problems))

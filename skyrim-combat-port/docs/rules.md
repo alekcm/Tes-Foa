@@ -18,7 +18,7 @@ hit-flags       = blocked
 hit-not-flags   = power
 attack.kind     = melee, ranged, spell, shout, unarmed | any
 attacker.race   = BearRace, Skyrim.esm|0x131E9, 0x000131E9
-attacker.weapon = mace, battleaxe, sword, axe, dagger, greatsword, fists, bow, staff, crossbow | any
+attacker.weapon = fists, sword, dagger, axe, mace, greatsword, battleaxe, bow, staff, crossbow | any
 attacker.shield = yes | no | any
 hit.source      = <форма чем бьют: оружие / заклинание / крик>
 hit.projectile  = <форма снаряда: болт / стрела / файрбол>
@@ -66,32 +66,31 @@ do              = unblock, stagger
 ## Текущие правила (они же встроенные, если файла нет)
 
 ```
-[bandit-bash-breaks-weapon-block]   # правило 1: щитоносец выбивает блок оружием/кулаками
+[shield-bash-staggers-unblocked]   # правило 1: щит дезориентирует только БЕЗ блока
 trigger = hit, bash
-hit-flags = blocked
-attacker.shield = yes
-player.blocking = yes
-player.shield = no
-do = unblock, stagger
+player.blocking = no
+do = stagger
+cooldown = 3
 
-[heavy-blunt-power-breaks-shield-block]   # правило 2: щит пробивает силовая булава/двуручник
+[onehand-mace-power-breaks-shield-block]   # правило 2: щит пробивает силовая булава
 trigger = hit
 hit-flags = blocked, power
-attacker.weapon = mace, battleaxe
+attacker.weapon = mace
 player.blocking = yes
 player.shield = yes
 do = unblock, stagger
 ```
 
+Обрати внимание: `battleaxe` здесь больше нет — это весь двуручный тип движка (`kTwoHandAxe`),
+то есть и топор, и молот; по решению 22.11.2026 обычное двуручное щит не пробивает.
+
 ## Примеры правок
 
-**«Хочу, чтобы щит пробивал ещё и двуручный меч»** — одна строка:
+**«Хочу, чтобы щит пробивал ещё и двуручный молот»** — но сперва нужен код: движок отдаёт
+двуручный топор и молот одним типом, поэтому сначала в коде появляется признак по кейворду
+`WeapTypeWarhammer`, и только потом в правиле можно написать `attacker.weapon = mace, warhammer`.
 
-```
-attacker.weapon = mace, battleaxe, greatsword
-```
-
-**«Хочу, чтобы любой враг с топором тоже выбивал меня из блока оружием»** — новая секция:
+**«Хочу, чтобы топор снова выбивал из блока»** (отменённое решение — пример правки) — новая секция:
 
 ```
 [axe-breaks-weapon-block]
@@ -103,6 +102,8 @@ attacker.weapon = axe, battleaxe
 do = unblock, stagger
 cooldown = 4
 ```
+
+Сейчас этого правила нет: 22.11.2026 решено, что топор не оглушает и блок не пробивает.
 
 **«Удар медведя выбивает из равновесия»** — новая секция (у существа нет оружия, поэтому
 фильтр по оружию не ставится; `reach = no`, потому что `fCombatBashReach` — про баш, а не про лапы):
