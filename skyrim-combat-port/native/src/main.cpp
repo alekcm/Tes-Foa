@@ -58,6 +58,7 @@ namespace
 	void OnBashLanded(RE::Actor* a_actor);
 	void OnBashFinished(RE::Actor* a_actor);
 	void OnPlayerHit(RE::Actor* a_attacker, REX::EnumSet<RE::TESHitEvent::Flag, std::uint8_t> a_flags);
+	void OrderBash(RE::Actor* a_actor, float a_distance, Clock::time_point a_now);
 
 	// Слушает animation events актёра, которому заказали баш: единственное, что граф реально
 	// рассылает, — bashStop (лог 0.6.2). Служит запасным триггером для НАШЕГО заказа,
@@ -142,21 +143,12 @@ namespace
 	RE::SpellItem*             g_staggerSpell{ nullptr };
 	bool                       g_staggerSearched{ false };
 	Clock::time_point          g_lastStagger{};
-	// Отложенный стаггер: наш баш попаданий не создаёт, поэтому эффект применяем с небольшой
-	// задержкой от начала замаха, чтобы совпасть с моментом удара.
-	struct PendingStagger
-	{
-		RE::ActorHandle   source;
-		Clock::time_point at;
-	};
-
-	std::vector<PendingStagger> g_pendingStaggers;
-
-	// Пробы «вышел ли игрок из блока» после наложенного стаггера.
+	// Пробы «вышел ли игрок из блока» после сработавшего правила.
 	struct BlockProbe
 	{
 		Clock::time_point at;
 		std::string       source;
+		bool              kick{ false };
 	};
 
 	std::vector<BlockProbe> g_blockProbes;
@@ -401,12 +393,6 @@ namespace
 		g_staggers.fetch_add(1, std::memory_order_relaxed);
 		g_lastStagger = Clock::now();
 
-		for (const float offset : { 0.15f, 0.45f, 0.9f, 1.4f }) {
-			g_blockProbes.push_back(BlockProbe{
-				Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(offset)),
-				a_why });
-		}
-
 		logs::info("stagger cast: {} caster={} spell={} ({:08X}) mag={:.2f} игрок блокирует={}",
 			a_why,
 			a_source->GetName(),
@@ -437,11 +423,564 @@ namespace
 			const bool blocking = player->IsBlocking();
 			const bool staggered = player->IsStaggering();
 			logs::info("block probe: {} blocking={} staggered={}", it->source, blocking, staggered);
-			if (blocking && staggered) {
+			if (it->kick && blocking && staggered) {
 				// Блок вернулся, пока игрок ещё в стаггере — гасим снова (AS-10).
 				KickBlock(player, it->source.c_str());
 			}
 			it = g_blockProbes.erase(it);
+		}
+	}
+
+	// ==================== движок правил ====================
+	// Правило — это ДАННЫЕ, а не код: секция в Data/SKSE/Plugins/TGCombatPort/Rules.txt.
+	//   «такая-то атака такого-то врага делает то же самое» = новая секция [имя] в файле;
+	//   «и ещё вот это происходит» = дописать эффект в строку do = ...
+	// Код не знает ни про бандита, ни про булаву: он умеет только проверять условия
+	// и запускать эффекты из kEffectTable. Добавили эффект — одна запись в таблице.
+
+	enum class Tri { kAny, kYes, kNo };
+	enum class EffectId { kStagger, kUnblock, kBash };
+
+	constexpr unsigned kTriggerHit = 1u << 0;   // настоящее попадание (RE::TESHitEvent)
+	constexpr unsigned kTriggerBash = 1u << 1;  // наш заказанный баш закончился (bashStop)
+
+	struct EffectDef
+	{
+		const char* id;
+		EffectId    effect;
+	};
+
+	constexpr EffectDef kEffectTable[] = {
+		{ "stagger", EffectId::kStagger },  // стаггер спеллом от имени NPC (ApplyStagger)
+		{ "unblock", EffectId::kUnblock },  // снять блок и удерживать снятым (KickBlock)
+		{ "bash", EffectId::kBash },        // заказать NPC баш (OrderBash)
+	};
+
+	struct WeaponDef
+	{
+		const char*     id;
+		RE::WEAPON_TYPE type;
+	};
+
+	constexpr WeaponDef kWeaponTable[] = {
+		{ "fists", RE::WEAPON_TYPE::kHandToHandMelee },
+		{ "sword", RE::WEAPON_TYPE::kOneHandSword },
+		{ "dagger", RE::WEAPON_TYPE::kOneHandDagger },
+		{ "axe", RE::WEAPON_TYPE::kOneHandAxe },
+		{ "mace", RE::WEAPON_TYPE::kOneHandMace },
+		{ "greatsword", RE::WEAPON_TYPE::kTwoHandSword },
+		{ "battleaxe", RE::WEAPON_TYPE::kTwoHandAxe },
+		{ "bow", RE::WEAPON_TYPE::kBow },
+		{ "staff", RE::WEAPON_TYPE::kStaff },
+		{ "crossbow", RE::WEAPON_TYPE::kCrossbow },
+	};
+
+	struct Rule
+	{
+		std::string                  name;
+		unsigned                     triggers{ 0 };
+		std::uint8_t                 hitRequire{ 0 };
+		std::uint8_t                 hitForbid{ 0 };
+		Tri                          attackerShield{ Tri::kAny };
+		Tri                          playerBlocking{ Tri::kYes };
+		Tri                          playerShield{ Tri::kAny };
+		std::vector<RE::WEAPON_TYPE> weapons;
+		bool                         reach{ true };
+		float                        cooldown{ 4.0f };
+		std::vector<EffectId>        effects;
+		Clock::time_point            lastFired{};
+	};
+
+	std::vector<Rule> g_rules;
+
+	// Отложенный запуск правила: у заказанного баша нет попадания, эффект нужен в момент удара.
+	struct PendingFire
+	{
+		RE::ActorHandle   source;
+		Clock::time_point at;
+		std::size_t       rule{ 0 };
+	};
+
+	std::vector<PendingFire> g_pendingFires;
+
+	const RE::TESObjectWEAP* GetEquippedWeapon(RE::Actor* a_actor)
+	{
+		if (!a_actor) {
+			return nullptr;
+		}
+		for (const bool leftHand : { false, true }) {
+			if (auto* equipped = a_actor->GetEquippedObject(leftHand)) {
+				if (const auto* weapon = equipped->As<RE::TESObjectWEAP>()) {
+					return weapon;
+				}
+			}
+		}
+		return nullptr;
+	}
+
+	bool MatchTri(Tri a_condition, bool a_value)
+	{
+		switch (a_condition) {
+		case Tri::kAny: return true;
+		case Tri::kYes: return a_value;
+		case Tri::kNo:  return !a_value;
+		}
+		return false;
+	}
+
+	std::string Trim(std::string a_text)
+	{
+		const auto notSpace = [](unsigned char a_char) { return !std::isspace(a_char); };
+		a_text.erase(a_text.begin(), std::find_if(a_text.begin(), a_text.end(), notSpace));
+		a_text.erase(std::find_if(a_text.rbegin(), a_text.rend(), notSpace).base(), a_text.end());
+		return a_text;
+	}
+
+	std::vector<std::string> SplitList(const std::string& a_text)
+	{
+		std::vector<std::string> items;
+		std::string              current;
+		for (const char character : a_text) {
+			if (character == ',') {
+				const auto item = Trim(current);
+				if (!item.empty()) {
+					items.push_back(item);
+				}
+				current.clear();
+			} else {
+				current.push_back(character);
+			}
+		}
+		const auto tail = Trim(current);
+		if (!tail.empty()) {
+			items.push_back(tail);
+		}
+		return items;
+	}
+
+	bool ParseTri(const std::string& a_value, Tri& a_out)
+	{
+		if (a_value == "yes") { a_out = Tri::kYes; return true; }
+		if (a_value == "no") { a_out = Tri::kNo; return true; }
+		if (a_value == "any") { a_out = Tri::kAny; return true; }
+		return false;
+	}
+
+	bool ParseWeapon(const std::string& a_value, RE::WEAPON_TYPE& a_out)
+	{
+		for (const auto& entry : kWeaponTable) {
+			if (a_value == entry.id) {
+				a_out = entry.type;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool ParseEffect(const std::string& a_value, EffectId& a_out)
+	{
+		for (const auto& entry : kEffectTable) {
+			if (a_value == entry.id) {
+				a_out = entry.effect;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	std::uint8_t HitFlagBit(const std::string& a_value)
+	{
+		if (a_value == "blocked") { return static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked); }
+		if (a_value == "power") { return static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kPowerAttack); }
+		if (a_value == "bash") { return static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kBashAttack); }
+		if (a_value == "sneak") { return static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kSneakAttack); }
+		return 0;
+	}
+
+	const char* TriText(Tri a_value)
+	{
+		switch (a_value) {
+		case Tri::kAny: return "any";
+		case Tri::kYes: return "yes";
+		case Tri::kNo:  return "no";
+		}
+		return "?";
+	}
+
+	std::string TriggerText(unsigned a_triggers)
+	{
+		std::string text;
+		if ((a_triggers & kTriggerHit) != 0) {
+			text = "hit";
+		}
+		if ((a_triggers & kTriggerBash) != 0) {
+			text += (text.empty() ? "" : ",") + std::string("bash");
+		}
+		return text.empty() ? std::string("none") : text;
+	}
+
+	std::string WeaponsText(const std::vector<RE::WEAPON_TYPE>& a_weapons)
+	{
+		if (a_weapons.empty()) {
+			return "any";
+		}
+		std::string text;
+		for (const auto type : a_weapons) {
+			for (const auto& entry : kWeaponTable) {
+				if (entry.type == type) {
+					text += (text.empty() ? "" : ",") + std::string(entry.id);
+					break;
+				}
+			}
+		}
+		return text;
+	}
+
+	std::string EffectsText(const std::vector<EffectId>& a_effects)
+	{
+		std::string text;
+		for (const auto effect : a_effects) {
+			for (const auto& entry : kEffectTable) {
+				if (entry.effect == effect) {
+					text += (text.empty() ? "" : ",") + std::string(entry.id);
+					break;
+				}
+			}
+		}
+		return text;
+	}
+
+	bool ApplyKey(Rule& a_rule, const std::string& a_key, const std::string& a_value)
+	{
+		if (a_key == "trigger") {
+			a_rule.triggers = 0;
+			for (const auto& item : SplitList(a_value)) {
+				if (item == "hit") {
+					a_rule.triggers |= kTriggerHit;
+				} else if (item == "bash") {
+					a_rule.triggers |= kTriggerBash;
+				} else {
+					return false;
+				}
+			}
+			return a_rule.triggers != 0;
+		}
+		if (a_key == "hit-flags" || a_key == "hit-not-flags") {
+			std::uint8_t bits = 0;
+			for (const auto& item : SplitList(a_value)) {
+				const auto bit = HitFlagBit(item);
+				if (bit == 0) {
+					return false;
+				}
+				bits |= bit;
+			}
+			if (a_key == "hit-flags") {
+				a_rule.hitRequire = bits;
+			} else {
+				a_rule.hitForbid = bits;
+			}
+			return true;
+		}
+		if (a_key == "attacker.shield") { return ParseTri(a_value, a_rule.attackerShield); }
+		if (a_key == "player.blocking") { return ParseTri(a_value, a_rule.playerBlocking); }
+		if (a_key == "player.shield") { return ParseTri(a_value, a_rule.playerShield); }
+		if (a_key == "attacker.weapon") {
+			a_rule.weapons.clear();
+			for (const auto& item : SplitList(a_value)) {
+				if (item == "any") {
+					continue;
+				}
+				RE::WEAPON_TYPE type{};
+				if (!ParseWeapon(item, type)) {
+					return false;
+				}
+				a_rule.weapons.push_back(type);
+			}
+			return true;
+		}
+		if (a_key == "reach") {
+			Tri tri{};
+			if (!ParseTri(a_value, tri)) {
+				return false;
+			}
+			a_rule.reach = tri != Tri::kNo;
+			return true;
+		}
+		if (a_key == "cooldown") {
+			try {
+				a_rule.cooldown = std::stof(a_value);
+			} catch (...) {
+				return false;
+			}
+			return a_rule.cooldown >= 0.0f;
+		}
+		if (a_key == "do") {
+			a_rule.effects.clear();
+			for (const auto& item : SplitList(a_value)) {
+				EffectId effect{};
+				if (!ParseEffect(item, effect)) {
+					return false;
+				}
+				a_rule.effects.push_back(effect);
+			}
+			return !a_rule.effects.empty();
+		}
+		return false;
+	}
+
+	void AddDefaultRules()
+	{
+		Rule bash;
+		bash.name = "bandit-bash-breaks-weapon-block";
+		bash.triggers = kTriggerHit | kTriggerBash;
+		bash.hitRequire = static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked);
+		bash.attackerShield = Tri::kYes;
+		bash.playerBlocking = Tri::kYes;
+		bash.playerShield = Tri::kNo;
+		bash.effects = { EffectId::kUnblock, EffectId::kStagger };
+		bash.cooldown = kStaggerCooldown;
+
+		Rule power;
+		power.name = "heavy-blunt-power-breaks-shield-block";
+		power.triggers = kTriggerHit;
+		power.hitRequire = static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked) |
+			static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kPowerAttack);
+		power.weapons = { RE::WEAPON_TYPE::kOneHandMace, RE::WEAPON_TYPE::kTwoHandAxe };
+		power.playerBlocking = Tri::kYes;
+		power.playerShield = Tri::kYes;
+		power.effects = { EffectId::kUnblock, EffectId::kStagger };
+		power.cooldown = kStaggerCooldown;
+
+		g_rules = { bash, power };
+	}
+
+	void LogRules()
+	{
+		logs::info("правил загружено: {}", g_rules.size());
+		for (const auto& rule : g_rules) {
+			logs::info("  [{}] trigger={} hit={:02X} not={:02X} attacker.shield={} attacker.weapon={} player.blocking={} player.shield={} reach={} do={}",
+				rule.name,
+				TriggerText(rule.triggers),
+				static_cast<unsigned>(rule.hitRequire),
+				static_cast<unsigned>(rule.hitForbid),
+				TriText(rule.attackerShield),
+				WeaponsText(rule.weapons),
+				TriText(rule.playerBlocking),
+				TriText(rule.playerShield),
+				rule.reach,
+				EffectsText(rule.effects));
+		}
+	}
+
+	std::filesystem::path RulesPath()
+	{
+		std::error_code error;
+		const auto      base = std::filesystem::current_path(error);
+		if (error) {
+			return {};
+		}
+		return base / "Data" / "SKSE" / "Plugins" / "TGCombatPort" / "Rules.txt";
+	}
+
+	// Допущение AS-11: файл правил лежит в Data/SKSE/Plugins/TGCombatPort/Rules.txt
+	// относительно рабочего каталога игры; если его нет — работают встроенные правила.
+	void LoadRules()
+	{
+		g_rules.clear();
+
+		const auto    path = RulesPath();
+		std::ifstream file(path);
+		if (!file) {
+			logs::info("Rules.txt не найден [{}], работают встроенные правила", path.empty() ? std::string("<нет пути>") : path.string());
+			AddDefaultRules();
+			LogRules();
+			return;
+		}
+
+		std::vector<Rule> rules;
+		Rule              current;
+		bool              hasCurrent = false;
+		int               lineNumber = 0;
+		int               broken = 0;
+		std::string       line;
+
+		while (std::getline(file, line)) {
+			++lineNumber;
+			const auto comment = line.find_first_of("#;");
+			if (comment != std::string::npos) {
+				line.erase(comment);
+			}
+			line = Trim(line);
+			if (line.empty()) {
+				continue;
+			}
+			if (line.front() == '[' && line.back() == ']') {
+				if (hasCurrent) {
+					rules.push_back(current);
+				}
+				current = Rule{};
+				current.name = Trim(line.substr(1, line.size() - 2));
+				hasCurrent = true;
+				continue;
+			}
+			const auto equal = line.find('=');
+			if (equal == std::string::npos) {
+				logs::warn("Rules.txt:{}: строка без «=»: {}", lineNumber, line);
+				++broken;
+				continue;
+			}
+			if (!hasCurrent) {
+				logs::warn("Rules.txt:{}: ключ вне секции: {}", lineNumber, line);
+				++broken;
+				continue;
+			}
+			const auto key = Trim(line.substr(0, equal));
+			const auto value = Trim(line.substr(equal + 1));
+			if (!ApplyKey(current, key, value)) {
+				logs::warn("Rules.txt:{}: не понял «{} = {}»", lineNumber, key, value);
+				++broken;
+			}
+		}
+		if (hasCurrent) {
+			rules.push_back(current);
+		}
+
+		if (rules.empty()) {
+			logs::warn("Rules.txt: {} — правил нет, работают встроенные", path.string());
+			AddDefaultRules();
+		} else {
+			g_rules = std::move(rules);
+		}
+		logs::info("Rules.txt [{}]: правил {}, строк с ошибками {}", path.string(), g_rules.size(), broken);
+		LogRules();
+	}
+
+	bool RuleMatches(const Rule& a_rule, unsigned a_trigger, RE::Actor* a_attacker,
+		RE::PlayerCharacter* a_player, std::uint8_t a_hitFlags)
+	{
+		if (!a_attacker || !a_player || a_attacker->IsDead()) {
+			return false;
+		}
+		if ((a_rule.triggers & a_trigger) == 0) {
+			return false;
+		}
+		if (a_trigger == kTriggerHit) {
+			if ((a_hitFlags & a_rule.hitRequire) != a_rule.hitRequire) {
+				return false;
+			}
+			if ((a_hitFlags & a_rule.hitForbid) != 0) {
+				return false;
+			}
+		}
+		if (!MatchTri(a_rule.attackerShield, HasShield(a_attacker))) {
+			return false;
+		}
+		if (!MatchTri(a_rule.playerBlocking, a_player->IsBlocking())) {
+			return false;
+		}
+		if (!MatchTri(a_rule.playerShield, HasShield(a_player))) {
+			return false;
+		}
+		if (!a_rule.weapons.empty()) {
+			const auto* weapon = GetEquippedWeapon(a_attacker);
+			if (!weapon) {
+				return false;
+			}
+			const auto type = weapon->GetWeaponType();
+			if (std::find(a_rule.weapons.begin(), a_rule.weapons.end(), type) == a_rule.weapons.end()) {
+				return false;
+			}
+		}
+		if (a_rule.reach && a_attacker->GetPosition().GetDistance(a_player->GetPosition()) > g_bashReach) {
+			return false;
+		}
+		return true;
+	}
+
+	bool RuleOnCooldown(const Rule& a_rule, Clock::time_point a_now)
+	{
+		return a_rule.lastFired.time_since_epoch().count() != 0 &&
+			std::chrono::duration<float>(a_now - a_rule.lastFired).count() < a_rule.cooldown;
+	}
+
+	// Пробы «вышел ли игрок из блока»: одно измерение на сработавшее правило.
+	// a_kick — эффект unblock просил гасить блок, пока игрок стаггерится.
+	void ScheduleProbes(const std::string& a_why, bool a_kick)
+	{
+		for (auto& probe : g_blockProbes) {
+			if (probe.source == a_why) {
+				probe.kick = probe.kick || a_kick;
+				return;
+			}
+		}
+		for (const float offset : { 0.15f, 0.45f, 0.9f, 1.4f }) {
+			g_blockProbes.push_back(BlockProbe{
+				Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(offset)),
+				a_why,
+				a_kick });
+		}
+	}
+
+	void RunEffect(EffectId a_effect, RE::Actor* a_source, const std::string& a_why)
+	{
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		switch (a_effect) {
+		case EffectId::kStagger:
+			ApplyStagger(a_source, a_why.c_str());
+			break;
+		case EffectId::kUnblock:
+			KickBlock(player, a_why.c_str());
+			break;
+		case EffectId::kBash:
+			if (player && a_source) {
+				OrderBash(a_source, a_source->GetPosition().GetDistance(player->GetPosition()), Clock::now());
+			}
+			break;
+		}
+		ScheduleProbes(a_why, a_effect == EffectId::kUnblock);
+	}
+
+	void FireRule(Rule& a_rule, RE::Actor* a_source, const char* a_via)
+	{
+		a_rule.lastFired = Clock::now();
+		logs::info("rule fired: [{}] via={} actor={} effects={}",
+			a_rule.name,
+			a_via,
+			a_source->GetName(),
+			EffectsText(a_rule.effects));
+		for (const auto effect : a_rule.effects) {
+			RunEffect(effect, a_source, a_rule.name);
+		}
+	}
+
+	void ProcessPendingFires(Clock::time_point a_now)
+	{
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		if (!player) {
+			g_pendingFires.clear();
+			return;
+		}
+		for (auto it = g_pendingFires.begin(); it != g_pendingFires.end();) {
+			if (a_now < it->at) {
+				++it;
+				continue;
+			}
+			auto*             source = it->source.get().get();
+			const std::size_t index = it->rule;
+			it = g_pendingFires.erase(it);
+
+			if (!source || index >= g_rules.size()) {
+				continue;
+			}
+			auto& rule = g_rules[index];
+			if (!RuleMatches(rule, kTriggerBash, source, player, 0)) {
+				logs::info("rule skipped: [{}] источник уже не подходит", rule.name);
+				continue;
+			}
+			if (RuleOnCooldown(rule, a_now)) {
+				continue;
+			}
+			FireRule(rule, source, "заказ");
 		}
 	}
 
@@ -465,7 +1004,7 @@ namespace
 		logs::info("fCombatBashReach не найдена, дистанция баша = {:.0f} (значение из CK Wiki)", g_bashReach);
 	}
 
-	// Реакция на НАСТОЯЩЕЕ попадание по игроку.
+	// Реакция на НАСТОЯЩЕЕ попадание по игроку: условия берутся из правил (Rules.txt).
 	// Допущение AS-5: движок заполняет флаги так, как описано в перечислении TESHitEvent::Flag.
 	void OnPlayerHit(RE::Actor* a_attacker, REX::EnumSet<RE::TESHitEvent::Flag, std::uint8_t> a_flags)
 	{
@@ -474,47 +1013,47 @@ namespace
 			return;
 		}
 
-		const bool blocked = a_flags.any(RE::TESHitEvent::Flag::kHitBlocked);
-		const bool power = a_flags.any(RE::TESHitEvent::Flag::kPowerAttack);
-		const bool bash = a_flags.any(RE::TESHitEvent::Flag::kBashAttack);
-
-		if (!blocked || !player->IsBlocking()) {
-			return;  // правило 3: игрок не блокирует — не вмешиваемся
+		std::uint8_t bits = 0;
+		if (a_flags.any(RE::TESHitEvent::Flag::kHitBlocked)) {
+			bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked);
+		}
+		if (a_flags.any(RE::TESHitEvent::Flag::kPowerAttack)) {
+			bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kPowerAttack);
+		}
+		if (a_flags.any(RE::TESHitEvent::Flag::kBashAttack)) {
+			bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kBashAttack);
+		}
+		if (a_flags.any(RE::TESHitEvent::Flag::kSneakAttack)) {
+			bits |= static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kSneakAttack);
 		}
 
-		const bool playerShield = HasShield(player);
-		const bool attackerShield = HasShield(a_attacker);
-		const auto* heavyBlunt = GetHeavyBlunt(a_attacker);
-
-		// Правило 1: баш щитоносца по игроку, который блокирует не щитом.
-		if (bash && attackerShield && !playerShield) {
-			if (!StaggerOnCooldown(Clock::now())) {
-				ApplyStagger(a_attacker, "баш щитоносца (попадание)");
+		bool matched = false;
+		for (auto& rule : g_rules) {
+			if (!RuleMatches(rule, kTriggerHit, a_attacker, player, bits)) {
+				continue;
 			}
-			return;
-		}
-
-		// Правило 2: силовая атака булавы/двуручника по блоку щитом.
-		if (power && heavyBlunt && playerShield) {
-			if (!StaggerOnCooldown(Clock::now())) {
-				ApplyStagger(a_attacker, "силовая по блоку щитом (попадание)");
+			matched = true;
+			if (RuleOnCooldown(rule, Clock::now())) {
+				continue;
 			}
-			return;
+			FireRule(rule, a_attacker, "попадание");
 		}
 
-		if (g_hitLogged.fetch_add(1, std::memory_order_relaxed) < 8) {
-			logs::info("hit без эффекта: actor={} bash={} power={} blocked={} игрок.щит={} оружие={}",
+		if (!matched && g_hitLogged.fetch_add(1, std::memory_order_relaxed) < 8) {
+			const auto* heavyBlunt = GetHeavyBlunt(a_attacker);
+			logs::info("hit без эффекта: actor={} flags={:02X} блок={} игрок.блок={} игрок.щит={} враж.щит={} оружие={}",
 				a_attacker->GetName(),
-				bash,
-				power,
-				blocked,
-				playerShield,
-				heavyBlunt ? heavyBlunt->GetName() : "<нет>");
+				static_cast<unsigned>(bits),
+				a_flags.any(RE::TESHitEvent::Flag::kHitBlocked),
+				player->IsBlocking(),
+				HasShield(player),
+				HasShield(a_attacker),
+				heavyBlunt ? heavyBlunt->GetName() : (GetEquippedWeapon(a_attacker) ? GetEquippedWeapon(a_attacker)->GetName() : "<нет>"));
 		}
 	}
 
-	// Правило 1, запасной путь: наш заказанный баш попаданий не создаёт, поэтому эффект
-	// накладываем по окончанию его анимации (bashStop).
+	// Запасной путь для нашего заказа: баш попаданий не создаёт, поэтому эффект ставим
+	// в очередь на момент удара (bashStop + задержка). Условия — те же правила, trigger = bash.
 	// Допущения: AS-3 (bashStop = конец замаха), AS-8 (момент совпадает с «щит достал»).
 	void OnBashFinished(RE::Actor* a_actor)
 	{
@@ -527,27 +1066,31 @@ namespace
 			return;
 		}
 
-		const float distance = a_actor->GetPosition().GetDistance(player->GetPosition());
-		const bool  withShield = HasShield(a_actor);
-		const bool  playerBlocking = player->IsBlocking();
-		const bool  playerShield = playerBlocking && HasShield(player);
+		bool matched = false;
+		for (std::size_t index = 0; index < g_rules.size(); ++index) {
+			auto& rule = g_rules[index];
+			if (!RuleMatches(rule, kTriggerBash, a_actor, player, 0)) {
+				continue;
+			}
+			matched = true;
+			if (RuleOnCooldown(rule, Clock::now())) {
+				continue;
+			}
+			g_pendingFires.push_back(PendingFire{
+				a_actor->GetHandle(),
+				Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kStaggerDelaySeconds)),
+				index });
+		}
 
-		if (!withShield || !playerBlocking || playerShield || distance > g_bashReach) {
-			logs::info("bash finished: actor={} dist={:.0f} shield={} игрок.блок={} игрок.щит={} → без эффекта",
+		if (!matched) {
+			const float distance = a_actor->GetPosition().GetDistance(player->GetPosition());
+			logs::info("bash finished: actor={} dist={:.0f} shield={} игрок.блок={} игрок.щит={} → ни одно правило не подошло",
 				a_actor->GetName(),
 				distance,
-				withShield,
-				playerBlocking,
-				playerShield);
-			return;
+				HasShield(a_actor),
+				player->IsBlocking(),
+				HasShield(player));
 		}
-		if (StaggerOnCooldown(Clock::now())) {
-			return;
-		}
-
-		g_pendingStaggers.push_back(PendingStagger{
-			a_actor->GetHandle(),
-			Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kStaggerDelaySeconds)) });
 	}
 
 	// bashStart слушателям не приходит (см. лог 0.6.2), оставляем только для истории.
@@ -557,30 +1100,6 @@ namespace
 			return;
 		}
 		logs::info("bandit anim: bashStart actor={} shield={}", a_actor->GetName(), HasShield(a_actor));
-	}
-
-	void ProcessPendingStaggers(Clock::time_point a_now)
-	{
-		auto* player = RE::PlayerCharacter::GetSingleton();
-		if (!player) {
-			g_pendingStaggers.clear();
-			return;
-		}
-
-		for (auto it = g_pendingStaggers.begin(); it != g_pendingStaggers.end();) {
-			if (a_now < it->at) {
-				++it;
-				continue;
-			}
-			auto* source = it->source.get().get();
-			const bool stillValid = source && !source->IsDead() &&
-				player->IsBlocking() && !HasShield(player) &&
-				source->GetPosition().GetDistance(player->GetPosition()) <= g_bashReach;
-			if (stillValid && !StaggerOnCooldown(a_now)) {
-				ApplyStagger(source, "баш щитоносца (заказ)");
-			}
-			it = g_pendingStaggers.erase(it);
-		}
 	}
 
 	void CloseExpiredWatches(Clock::time_point a_now)
@@ -768,7 +1287,7 @@ namespace
 		const auto now = Clock::now();
 		CloseExpiredWatches(now);
 		ProcessBlockProbes(now);
-		ProcessPendingStaggers(now);
+		ProcessPendingFires(now);
 
 		if (!g_staggerSearched) {
 			InitStaggerSpell();
@@ -846,6 +1365,7 @@ SKSE_PLUGIN_LOAD(const SKSE::LoadInterface* a_skse)
 		version.build());
 
 	ReadEngineSettings();
+	LoadRules();
 
 	if (const auto papyrus = SKSE::GetPapyrusInterface(); papyrus) {
 		papyrus->Register(RegisterPapyrusFunctions);

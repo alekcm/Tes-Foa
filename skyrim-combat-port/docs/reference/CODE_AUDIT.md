@@ -27,6 +27,22 @@
 | `IsWatchedBash` | только свои заказы (иначе вмешивались бы в ванильный AI) | — | — |
 | `InitStaggerSpell` | `MagicItem::HasEffect(EffectArchetype::kStagger)`; CK Wiki: архетип и смысл magnitude/duration **[B]** | — | `stagger spell: …`, `stagger: выбран спелл …` |
 | `StaggerOnCooldown` | наша логика (4 с) | — | — |
+| `GetEquippedWeapon` | `TESForm::As<TESObjectWEAP>()` по `Actor::GetEquippedObject` **[A]** | — | `hit без эффекта: … оружие=…` |
+| `MatchTri` | сопоставление `any/yes/no` с фактом | — | — |
+| `Trim` / `SplitList` | разбор строк файла правил | — | — |
+| `ParseTri` / `ParseWeapon` / `ParseEffect` / `HitFlagBit` | имена из `kWeaponTable` / `kEffectTable` / `TESHitEvent::Flag` **[A]** | — | строка `Rules.txt:…: не понял «…»` при опечатке |
+| `ApplyKey` | ключи файла правил (формат наш, описан в `Rules.txt`) | — | `Rules.txt [путь]: правил N, строк с ошибками 0` |
+| `AddDefaultRules` | встроенная копия тех же двух правил | — | `Rules.txt не найден […], работают встроенные правила` |
+| `RulesPath` | `std::filesystem::current_path()` + путь `Data/SKSE/Plugins/…` | `AS-11` | путь в логе совпадает с реальным |
+| `LoadRules` | чтение файла, `std::getline`, `ApplyKey` | `AS-11` | `Rules.txt [путь]: правил 2` |
+| `LogRules` | печать таблицы правил | — | по строке `[имя] trigger=… do=…` на правило |
+| `TriText` / `TriggerText` / `WeaponsText` / `EffectsText` | печать правил в лог | — | те же строки |
+| `RuleMatches` | условия правила: флаги попадания, щит, блок, тип оружия, дистанция | `AS-5` | `rule fired:` появляется только при подходящих условиях |
+| `RuleOnCooldown` | своя логика (поле `cooldown`) | — | повторные попадания подряд не спамят эффектом |
+| `ScheduleProbes` | пробы блока после эффекта | `AS-7` | `block probe: …` |
+| `RunEffect` | таблица эффектов: `stagger` → `ApplyStagger`, `unblock` → `KickBlock`, `bash` → `OrderBash` **[A]** | `AS-10` | `rule fired: … effects=unblock,stagger` |
+| `FireRule` | применение эффектов по порядку + кулдаун правила | — | `rule fired: [имя] via=попадание|заказ` |
+| `ProcessPendingFires` | отложенный запуск правила на заказ баша | `AS-3` | `rule fired: … via=заказ` или `rule skipped: …` |
 | `KickBlock` | своего API для блока нет (`verify_api.py`), состояние блока живёт в графе; `blockStop` — событие графа **[A]/[B]** | `AS-10` | `block kick: … blockStop sent=true` |
 | `ApplyStagger` | `MagicCaster::CastSpellImmediate` (VTABLE 01); `MagicSystem::CastingSource::kInstant` **[A]** | `AS-2`, `AS-4`, `AS-10` (`AS-1` опровергнуто) | `stagger cast: … mag=1.00` |
 | `ProcessBlockProbes` | `Actor::IsBlocking()`, `Actor::IsStaggering()` **[A]** | `AS-7` | `block probe: … blocking=… staggered=…` |

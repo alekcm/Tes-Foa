@@ -3,7 +3,7 @@
 Здесь лежит C++ часть мода. Она нужна только для того, чего не умеет Papyrus:
 точное чтение состояния анимации и (в перспективе) управление действиями NPC.
 
-## Что уже есть (0.7.2)
+## Что уже есть (0.8.0)
 
 Хуков (патчинга кода игры) нет: версия 0.1.1 патчила `Actor::GetAttackChance` и вызывала вылет, способ убран.
 
@@ -64,6 +64,28 @@ stagger applied: баш щитоносца, игрок блокирует без
 Пошагово, для первого раза: [`docs/console_spawn.md`](../docs/console_spawn.md). Коротко: `ё` —
 консоль, `help draugr 4`, клик по строке, `player.placeatme <ID> 1`, Enter. Для проверки механики
 это не требуется: она срабатывает в любой драке с бандитом, у которого есть щит.
+
+### 0.8.0: правила — данные, а не код
+
+Вся боевая логика переехала в `Data\SKSE\Plugins\TGCombatPort\Rules.txt`. В DLL остался движок:
+
+- **условия** (`RuleMatches`): `trigger` (hit/bash), `hit-flags`/`hit-not-flags`, `attacker.shield`,
+  `attacker.weapon`, `player.blocking`, `player.shield`, `reach` (дистанция `fCombatBashReach`);
+- **эффекты** (`kEffectTable` → `RunEffect`): `unblock`, `stagger`, `bash`;
+- **исполнитель** (`FireRule`): кулдаун правила, запись `rule fired: [имя] via=… effects=…` в лог;
+- **читатель** (`LoadRules`): печатает `Rules.txt [путь]: правил N` и по строке на правило;
+  если файла нет — работают те же правила, встроенные в DLL.
+
+Что это даёт на практике:
+
+| Запрос | Что менять |
+|---|---|
+| «такая-то атака такого-то врага делает то же» | новая секция `[имя]` в `Rules.txt` |
+| «плюс у меня в этот момент происходит ещё вот это» | дописать эффект в `do = …` |
+| «нужен новый вид эффекта» | одна запись в `kEffectTable` + `case` в `RunEffect` + функция |
+
+Порядок эффектов значим: `do = unblock, stagger` — сначала снимается блок, потом накладывается
+стаггер, иначе проба успевает зафиксировать, что блок ещё держится.
 
 ### 0.7.2: блок снимаем отдельно от стаггера
 
@@ -209,7 +231,7 @@ xmake build
 
 Собранный плагин публикуется как GitHub Release по тегу `v*`:
 
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.7.2/TGCombatPort-v0.7.2.zip —
+- https://github.com/alekcm/Tes-Foa/releases/download/v0.8.0/TGCombatPort-v0.8.0.zip —
   архив с `SKSE/Plugins/TGCombatPort.dll`, распаковывается в папку `Data` игры
   или ставится как обычный мод в Vortex.
 
@@ -229,15 +251,15 @@ xmake build
   (`dir "%USERPROFILE%\Downloads\TGCombatPort*.dll"`) и скопируйте нужный с переименованием;
 - если мод стоит в **Vortex**, он раскладывает файлы в `Data` сам при развёртывании и может вернуть
   старую версию поверх ручной копии. В этом случае ставить надо архив
-  (`TGCombatPort-v0.7.2.zip`) через Vortex → Install From File, а не копированием.
+  (`TGCombatPort-v0.8.0.zip`) через Vortex → Install From File, а не копированием.
 
 ## Установка (для проверки)
 
-1. Скачать `TGCombatPort-v0.7.2.zip` по ссылке выше.
+1. Скачать `TGCombatPort-v0.8.0.zip` по ссылке выше.
 2. Распаковать в папку `Data` игры (cmd):
 
 ```cmd
-tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.7.2.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
+tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.8.0.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
 ```
 
 3. Поставить **Address Library v13** (Nexus, мод 32444, файл для 1.6+) — без него DLL не загрузится.

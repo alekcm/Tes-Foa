@@ -1,0 +1,42 @@
+# TGCombatPort — правила механики.
+# Файл ставится в Data\SKSE\Plugins\TGCombatPort\Rules.txt.
+# Плагин читает его при запуске игры и печатает в лог: "Rules.txt [...]: правил N".
+#
+# Каждая секция [имя] — одно правило. «Хочу, чтобы такая-то атака такого-то врага
+# делала то же самое» — это новая секция здесь, код менять не нужно.
+#
+# Ключи:
+#   trigger         = hit, bash      hit — настоящее попадание; bash — наш заказанный баш
+#   hit-flags       = blocked, power, bash, sneak   (все перечисленные должны быть у попадания)
+#   hit-not-flags   = power          (ни одного из перечисленных быть не должно)
+#   attacker.shield = yes | no | any   щит у того, кто бьёт
+#   attacker.weapon = mace, battleaxe, sword, … | any
+#   player.blocking = yes | no | any   игрок блокирует прямо сейчас
+#   player.shield   = yes | no | any   игрок блокирует щитом
+#   reach           = yes | no         проверять дистанцию fCombatBashReach
+#   cooldown        = секунды между срабатываниями правила
+#   do              = unblock, stagger, bash   (порядок сохраняется)
+#
+# Эффекты: unblock — снять блок и удерживать снятым ~1 с;
+#          stagger — стаггер спеллом от имени бьющего (дезориентация);
+#          bash    — заказать бьющему баш.
+
+[bandit-bash-breaks-weapon-block]
+# Щитоносец выбивает из блока того, кто блокирует оружием или кулаками (правило 1).
+trigger = hit, bash
+hit-flags = blocked
+attacker.shield = yes
+player.blocking = yes
+player.shield = no
+do = unblock, stagger
+cooldown = 4
+
+[heavy-blunt-power-breaks-shield-block]
+# Щит пробивает только силовая атака булавы или двуручного молота (правило 2).
+trigger = hit
+hit-flags = blocked, power
+attacker.weapon = mace, battleaxe
+player.blocking = yes
+player.shield = yes
+do = unblock, stagger
+cooldown = 4
