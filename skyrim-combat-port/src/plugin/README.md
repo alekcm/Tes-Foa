@@ -15,7 +15,7 @@
 - После сохранения плагина в CK скопировать его из `Data` игры в эту папку (или сразу сохранить сюда, если CK
   позволяет выбрать путь, а затем скопировать обратно в `Data` для теста в игре).
 - Перед коммитом проверить зависимости:
-  ```powershell
+  ```cmd
   python tools\inspect_plugin.py src\plugin\TGCombatPort.esp --strict
   ```
   Не должно быть мастер-файлов, кроме `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`, `HearthFires.esm`,
@@ -23,7 +23,7 @@
 
 Сборка с этим плагином:
 
-```powershell
+```cmd
 python tools\build.py --name TGCombatPort --version 0.1.0 --plugin src\plugin\TGCombatPort.esp
 ```
 

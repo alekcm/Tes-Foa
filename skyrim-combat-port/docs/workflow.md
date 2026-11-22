@@ -23,7 +23,7 @@
 1. Я меняю исходники в репозитории и пушу.
 2. Ты делаешь `git pull`.
 3. Собираешь:
-   ```powershell
+   ```cmd
    python tools\build.py --name TGCombatPort --version 0.1.0 --plugin src\plugin\TGCombatPort.esp
    ```
    Если плагина ещё нет — `--skip-package`, соберутся только скрипты.
@@ -34,16 +34,16 @@
 
 ### Ошибка сборки
 
-Она появляется прямо в окне PowerShell. Чтобы сохранить её в файл, запусти сборку так:
+Она появляется прямо в окне командной строки. Чтобы сохранить её в файл, запусти сборку так:
 
-```powershell
-New-Item -ItemType Directory -Force logs | Out-Null
-python tools\build.py --name TGCombatPort --version 0.1.0 --plugin src\plugin\TGCombatPort.esp 2>&1 |
-  Tee-Object -FilePath logs\build_log.txt
+```cmd
+if not exist logs mkdir logs
+python tools\build.py --name TGCombatPort --version 0.1.0 --plugin src\plugin\TGCombatPort.esp > logs\build_log.txt 2>&1
+type logs\build_log.txt
 ```
 
-Присылать: файл `logs\build_log.txt` целиком (он короткий). Если `Tee-Object` не сработал — выдели текст
-в консоли мышью и нажми Enter, чтобы скопировать.
+Присылать: файл `logs\build_log.txt` целиком (он короткий). Если файл не появился — выдели текст в консоли
+мышью и нажми Enter, чтобы скопировать.
 
 ### Лог Papyrus
 
@@ -61,7 +61,7 @@ python tools\build.py --name TGCombatPort --version 0.1.0 --plugin src\plugin\TG
    `Documents\My Games\Skyrim Special Edition\Logs\Script\Papyrus.0.log`
 4. Собери из него короткую выжимку:
 
-   ```powershell
+   ```cmd
    python tools\collect_logs.py
    ```
 

@@ -16,12 +16,13 @@
 
 > Эти сведения фиксируют целевую совместимость, а не дают агенту доступ к компьютеру пользователя. Игра и локальные инструменты не должны загружаться в Git. Если потребуется внутриигровая проверка и Skyrim отсутствует в sandbox, пользователь запускает её локально и передаёт результаты.
 
-Windows PowerShell для чтения версии (замени путь на путь к своему `SkyrimSE.exe`):
+Как прочитать версию вручную (командная строка cmd, замени путь на свой `SkyrimSE.exe`):
 
-```powershell
-(Get-Item 'D:\Games\Skyrim Special Edition\SkyrimSE.exe').VersionInfo |
-  Select-Object FileVersion, ProductVersion
+```cmd
+wmic datafile where name="A:\\SteamLibrary\\steamapps\\common\\Skyrim Special Edition\\SkyrimSE.exe" get Version
 ```
+
+Либо правый клик по `SkyrimSE.exe` → **Свойства** → вкладка **Подробности** → строка «Версия файла».
 
 ## Разработка и запуск
 

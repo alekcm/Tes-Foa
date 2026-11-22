@@ -15,8 +15,8 @@
 
 ```bash
 # Сначала перейди в распакованную папку проекта.
-# Windows PowerShell, если распаковал в Downloads:
-Set-Location "$HOME\Downloads\skyrim-combat-port"
+# Windows (cmd), если распаковал в Downloads:
+cd /d "%USERPROFILE%\Downloads\skyrim-combat-port"
 # На macOS/Linux укажи свой путь, например:
 # cd "$HOME/Downloads/skyrim-combat-port"
 

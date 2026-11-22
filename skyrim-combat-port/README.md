@@ -13,7 +13,7 @@
 
 ## Быстрый старт
 
-```powershell
+```cmd
 python tools\check_env.py --tier papyrus   # что установлено
 python tools\build.py --name TGCombatPort --version 0.1.0 --plugin build\TGCombatPort.esp
 # без готового .esp: добавь --skip-package и соберутся только скрипты

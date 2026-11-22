@@ -65,12 +65,10 @@
 
 Точные пути зависят от установки; ниже — форма команды, а не проверенный факт:
 
-```powershell
-& "C:\путь\к\Papyrus Compiler\PapyrusCompiler.exe" `
-  "src\papyrus\MyScript.psc" `
-  -f="TESV_Papyrus_Flags.flg" `
-  -i="C:\путь\к\Data\Scripts\Source" `
-  -o="build\Scripts"
+Одной строкой (командная строка cmd; переносы строки в cmd делаются через `^`, но проще одной строкой):
+
+```cmd
+"C:\путь\к\Papyrus Compiler\PapyrusCompiler.exe" MyScript.psc -f="TESV_Papyrus_Flags.flg" -i="C:\путь\к\Data\Scripts\Source" -o="build\Scripts"
 ```
 
 После первой успешной сборки заменить эту заготовку фактической командой, версией компилятора и датой.

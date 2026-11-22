@@ -5,6 +5,9 @@
 
 Время: 30–50 минут, из них большая часть — ожидание загрузки Creation Kit.
 
+Все команды в этом файле — для **командной строки Windows** (`cmd`), а не PowerShell. Открыть её:
+**Win+R** → `cmd` → **Enter**. Команды вставляются правым кликом мыши.
+
 Названия кнопок в Creation Kit могут немного отличаться в твоей версии/языке. Если пункта нет — напиши,
 какие пункты видишь, я поправлю.
 
@@ -19,9 +22,9 @@
   **«Add python.exe to PATH»**.
 - Место на диске под проект: любая папка, например `D:\Mods\Tes-Foa`. Путь лучше латиницей и не в OneDrive.
 
-Проверка Python: открой PowerShell (Win+R → `powershell` → Enter) и выполни:
+Проверка Python: открой командную строку (Win+R → `cmd` → Enter) и выполни:
 
-```powershell
+```cmd
 python --version
 ```
 
@@ -47,12 +50,17 @@ python --version
 
 ## Шаг 2. Проверить, что инструменты на месте
 
-В папке `skyrim-combat-port`: Shift + правый клик по пустому месту → **«Открыть окно PowerShell здесь»**
-(или `cd D:\Mods\Tes-Foa\skyrim-combat-port`).
+Открой командную строку: **Win+R** → `cmd` → **Enter**. Затем перейди в папку проекта, например:
+
+```cmd
+cd /d D:\Mods\Tes-Foa\skyrim-combat-port
+```
+
+(Если проект в другом месте — подставь свой путь. `cd` без `/d` не переключит диск.)
 
 Выполни:
 
-```powershell
+```cmd
 python tools\check_env.py
 ```
 
@@ -63,8 +71,8 @@ python tools\check_env.py
    файлы**. Откроется папка, где лежит `SkyrimSE.exe`. Скопируй путь из адресной строки проводника.
 2. В папке проекта выполни:
 
-   ```powershell
-   Copy-Item .env.example .env
+   ```cmd
+   copy .env.example .env
    notepad .env
    ```
 
@@ -90,7 +98,7 @@ python tools\check_env.py
 
 ## Шаг 3. Скомпилировать скрипты
 
-```powershell
+```cmd
 python tools\build.py --name TGCombatPort --version 0.1.0 --skip-package
 ```
 
@@ -100,22 +108,27 @@ python tools\build.py --name TGCombatPort --version 0.1.0 --skip-package
 
 Если ошибка — запусти ещё раз так и пришли файл:
 
-```powershell
-New-Item -ItemType Directory -Force logs | Out-Null
-python tools\build.py --name TGCombatPort --version 0.1.0 --skip-package 2>&1 | Tee-Object -FilePath logs\build_log.txt
+```cmd
+if not exist logs mkdir logs
+python tools\build.py --name TGCombatPort --version 0.1.0 --skip-package > logs\build_log.txt 2>&1
+type logs\build_log.txt
 ```
 
 ---
 
 ## Шаг 4. Положить скрипты в игру
 
-Скопируй 4 файла `TGCP_*.pex` из `skyrim-combat-port\build\stage\Scripts\` в:
+Скопируй 4 файла `TGCP_*.pex` из `skyrim-combat-port\build\stage\Scripts\` в папку `Data\Scripts` игры.
 
-```
-...\Steam\steamapps\common\Skyrim Special Edition\Data\Scripts\
+```cmd
+copy /Y build\stage\Scripts\*.pex "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data\Scripts\"
 ```
 
-Если папки `Scripts` там нет — создай.
+Путь к игре подставь свой. Если папки `Scripts` там нет — создай её или выполни:
+
+```cmd
+mkdir "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data\Scripts"
+```
 
 Проверка: в `Data\Scripts` лежат четыре файла `TGCP_*.pex`.
 
@@ -270,7 +283,7 @@ CK загружает игру несколько минут. Окно може�
 CK сохраняет молча: если галочка не встала или скрипт не привязался, ошибки не будет, просто в игре ничего
 не произойдёт. Проверим текстом, прямо по файлу `TGCombatPort.esp` (присылать сам файл не нужно):
 
-```powershell
+```cmd
 python tools\inspect_records.py "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data\TGCombatPort.esp"
 ```
 
@@ -306,7 +319,7 @@ skyrim-combat-port\src\plugin\
 
 Игра запускает только те плагины, которые отмечены в списке. Сделаем это командой (игра должна быть закрыта):
 
-```powershell
+```cmd
 python tools\enable_plugin.py --enable TGCombatPort.esp
 python tools\enable_plugin.py --status TGCombatPort.esp
 ```
@@ -353,13 +366,13 @@ python tools\enable_plugin.py --status TGCombatPort.esp
 
 Поэтому не ищем руками, а запускаем скрипт:
 
-```powershell
+```cmd
 python tools\papyrus_logging.py
 ```
 
 Он печатает, какие папки проверял и где нашёл `Skyrim.ini`. Дальше:
 
-```powershell
+```cmd
 python tools\papyrus_logging.py --enable
 ```
 
@@ -387,9 +400,9 @@ bLoadDebugInformation=1
 2. Начни новую игру или загрузи сохранение.
 3. Подожди 10–15 секунд в мире.
 4. Выйди из игры.
-5. В PowerShell в папке проекта:
+5. В командной строке в папке проекта:
 
-```powershell
+```cmd
 python tools\collect_logs.py
 ```
 
