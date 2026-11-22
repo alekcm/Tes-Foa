@@ -74,7 +74,7 @@ namespace
 
 	RE::TESCombatStyle* GetCombatStyle(RE::Actor* a_actor)
 	{
-		const auto* base = a_actor->GetActorBase();
+		auto* base = a_actor->GetActorBase();
 		return base ? base->GetCombatStyle() : nullptr;
 	}
 
