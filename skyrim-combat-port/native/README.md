@@ -3,7 +3,7 @@
 Здесь лежит C++ часть мода. Она нужна только для того, чего не умеет Papyrus:
 точное чтение состояния анимации и (в перспективе) управление действиями NPC.
 
-## Что уже есть (0.6.1)
+## Что уже есть (0.6.2)
 
 Хуков (патчинга кода игры) нет: версия 0.1.1 патчила `Actor::GetAttackChance` и вызывала вылет, способ убран.
 
@@ -58,6 +58,12 @@ stagger: выбран спелл … (…), эффектов 1
 bandit anim: bashStart actor=Бандит shield=1
 stagger applied: баш щитоносца, игрок блокирует без щита spell=… (…)
 ```
+
+### 0.6.2: баш только с вынутым оружием и щитом
+
+Заказ на баш теперь отдаётся только когда у NPC оружие и щит **в руках** (`ActorState::IsWeaponDrawn()`).
+Пока они не вынуты, тот же `bashStart` граф проигрывает кулаком — это и есть «бьют рукой».
+Если условие не выполнено, в логе: `skip: actor=… оружие/щит не вынуты, баш будет кулаком`.
 
 ### 0.6.0: самодиагностика — сценарии для проверки больше не нужны
 
@@ -124,7 +130,7 @@ xmake build
 
 Собранный плагин публикуется как GitHub Release по тегу `v*`:
 
-- https://github.com/alekcm/Tes-Foa/releases/download/v0.6.1/TGCombatPort-v0.6.1.zip —
+- https://github.com/alekcm/Tes-Foa/releases/download/v0.6.2/TGCombatPort-v0.6.2.zip —
   архив с `SKSE/Plugins/TGCombatPort.dll`, распаковывается в папку `Data` игры
   или ставится как обычный мод в Vortex.
 
@@ -144,15 +150,15 @@ xmake build
   (`dir "%USERPROFILE%\Downloads\TGCombatPort*.dll"`) и скопируйте нужный с переименованием;
 - если мод стоит в **Vortex**, он раскладывает файлы в `Data` сам при развёртывании и может вернуть
   старую версию поверх ручной копии. В этом случае ставить надо архив
-  (`TGCombatPort-v0.6.1.zip`) через Vortex → Install From File, а не копированием.
+  (`TGCombatPort-v0.6.2.zip`) через Vortex → Install From File, а не копированием.
 
 ## Установка (для проверки)
 
-1. Скачать `TGCombatPort-v0.6.1.zip` по ссылке выше.
+1. Скачать `TGCombatPort-v0.6.2.zip` по ссылке выше.
 2. Распаковать в папку `Data` игры (cmd):
 
 ```cmd
-tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.6.1.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
+tar -xf "%USERPROFILE%\Downloads\TGCombatPort-v0.6.2.zip" -C "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data"
 ```
 
 3. Поставить **Address Library v13** (Nexus, мод 32444, файл для 1.6+) — без него DLL не загрузится.
