@@ -21,7 +21,6 @@ jobs:
     defaults:
       run:
         working-directory: skyrim-combat-port/native
-        shell: cmd
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,29 +32,21 @@ jobs:
           build-cache: false
 
       - name: Clone CommonLibSSE-NG
-        run: git clone --depth 1 -b ng https://github.com/alandtse/CommonLibVR.git lib\commonlibsse-ng
+        run: git clone --depth 1 -b ng https://github.com/alandtse/CommonLibVR.git lib/commonlibsse-ng
 
-      - name: Build
-        id: build
-        run: |
-          xmake f -y -m release > build.log 2>&1
-          if errorlevel 1 goto :report
-          xmake build -y -v >> build.log 2>&1
-          if errorlevel 1 goto :report
-          exit /b 0
-          :report
-          echo build failed
-          exit /b 1
-
-      - name: List build output
+      - name: Build and report
         shell: pwsh
-        run: |
-          $files = Get-ChildItem -Recurse -File skyrim-combat-port/native/build -ErrorAction SilentlyContinue |
-            Where-Object { $_.Extension -in '.dll', '.pdb' } | ForEach-Object { $_.FullName }
-          $text = if ($files) { $files -join "`n" } else { "DLL не найден в native/build" }
-          "Файлы сборки:`n`n" + $text | gh issue comment 1 --body-file - --repo $env:GITHUB_REPOSITORY
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          xmake f -y -m release *>&1 | Tee-Object -FilePath cfg.log
+          $cfgExit = $LASTEXITCODE
+          xmake build -y -v *>&1 | Tee-Object -FilePath build.log
+          $buildExit = $LASTEXITCODE
+          $tail = (Get-Content build.log -Tail 60 -ErrorAction SilentlyContinue) -join "`n"
+          "xmake f exit=$cfgExit, xmake build exit=$buildExit`n`n``````n$tail`n``````" |
+            gh issue comment 1 --body-file - --repo $env:GITHUB_REPOSITORY
+          if ($cfgExit -ne 0 -or $buildExit -ne 0) { exit 1 }
 
       - name: Upload DLL
         uses: actions/upload-artifact@v4
@@ -63,19 +54,3 @@ jobs:
           name: TGCombatPort-dll
           path: skyrim-combat-port/native/build/**/*.dll
           if-no-files-found: warn
-
-      - name: Report build error
-        if: failure()
-        shell: pwsh
-        run: |
-          $log = "skyrim-combat-port/native/build.log"
-          if (Test-Path $log) {
-            $tail = Get-Content $log -Tail 120 -Encoding utf8 | Out-String
-            $body = "Сборка SKSE-плагина упала. Хвост лога:`n`n``````n" + $tail + "`n``````"
-            $body | Out-File -Encoding utf8 comment.md
-            gh issue comment 1 --body-file comment.md --repo $env:GITHUB_REPOSITORY
-          } else {
-            "build.log не появился — xmake не дошёл до вывода" | gh issue comment 1 --body-file - --repo $env:GITHUB_REPOSITORY
-          }
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
