@@ -13,10 +13,12 @@
     алиас заполнился игроком, скрипты алиаса работают;
   - `[TGCP] probe: registered 12 candidate events` — `RegisterForAnimationEvent` принял все имена;
   - пришли события: `IdleStop` (29), `attackStop` (4), `blockStop` (2), `bashStop` (1);
-  - НЕ пришли: `blockStart`, `attackStart`, `attackRelease`, `bashStart`, `staggerStart`, `staggerStop`,
-    `JumpUp`, `JumpDown`. Значит задуманный признак «игрок блокирует» по `blockStart` пока не подтверждён;
-    список имён расширен до 24 (v2 пробника), нужен повторный прогон. Подробности —
-    `docs/papyrus_verification.md`, раздел «Что показал первый запуск в игре».
+  - Второй прогон (пробник v2, 24 имени, 05:21:26–05:22:51): пришли `attackStop` (18), `preHitFrame` (8),
+    `weaponSwing` (7), `blockStop` (3), **`blockStartOut` (3)**, `weaponDraw` (1), `bashStop` (1).
+    `blockStartOut` приходит в начале блока (05:22:25 → blockStop 05:22:29), поэтому признак «игрок блокирует»
+    строится на `blockStartOut`; `TGCP_PlayerBlockWatcher` v2 регистрирует `blockStart` + `blockStartOut` +
+    `blockStop` и пишет в лог имя сработавшего события. `attackStart`/`bashStart`/`stagger*` не пришли ни разу
+    (тест был не в бою). Подробности — `docs/papyrus_verification.md`.
   - Раннее (до включения плагина) четыре лога не содержали ни одной строки `[TGCP]`: причина была в
     `plugins.txt` — строка `TGCombatPort.esp` была без звёздочки, то есть плагин выключен.
 - Целевая редакция по сообщению пользователя: Skyrim SE со всеми официальными DLC (Dawnguard, Hearthfire, Dragonborn); состав Creation Club/AE-контента не подтверждён.

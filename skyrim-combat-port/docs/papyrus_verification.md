@@ -44,6 +44,36 @@
 (`TGCP_AnimEventProbe` v2: `blockHitStart`, `blockAnticipateStart`, `blockStartOut`, `preHitFrame`,
 `weaponSwing`, `attackStart_Attack1` и др.) — нужен повторный прогон.
 
+### Второй прогон (22.11.2026, 05:21:26–05:22:51, пробник v2 на 24 имени)
+
+Зарегистрировано 24 имени (`probe: registered 24 candidate events`), ошибок нет. Пришли:
+
+| Событие | Раз | Что это даёт |
+|---|---|---|
+| `attackStop` | 18 | конец атаки игрока |
+| `preHitFrame` | 8 | кадр попадания атаки — годится как «момент удара» |
+| `weaponSwing` | 7 | замах оружием |
+| `blockStop` | 3 | конец блока |
+| `blockStartOut` | 3 | **начало блока** |
+| `weaponDraw` | 1 | достал оружие |
+| `bashStop` | 1 | конец bash (толчка щитом/оружием) |
+
+Тайминги из того же лога: `blockStartOut` в 05:22:25 → `blockStop` в 05:22:29 (блок держали ~4 секунды);
+в 05:22:40 `blockStartOut` → в 05:22:41 `blockStop` и `bashStop` (bash прервал блок). То есть `blockStartOut`
+приходит **в начале** блока, а не в конце.
+
+Не пришли ни разу: `blockStart`, `blockHitStart`, `blockHitStop`, `blockAnticipateStart`,
+`blockAnticipateStop`, `blockStopOut`, `blockStopInstant`, `bashStart`, `bashRelease`, `attackStart`,
+`attackStart_Attack1`, `AttackStart`, `attackRelease`, `staggerStart`, `staggerStop`, `recoilStart`, `IdleStop`.
+
+Вывод, на котором построен `TGCP_PlayerBlockWatcher` v2: началом блока считаем `blockStart` **или**
+`blockStartOut`, концом — `blockStop`. Имя сработавшего события пишется в лог, поэтому следующий прогон
+покажет, какое именно работает.
+
+Открытый вопрос: почему `attackStart`/`bashStart`/`staggerStart` не приходят, хотя `*Stop` и `blockStartOut`
+приходят. Тест проводился **не в бою** (игрок махал в воздух). Возможная причина — другая ветка графа
+анимаций в бою; это проверяется только боем с NPC.
+
 Запасные варианты, если `*Start` не придут:
 1. Проверять состояние блока по факту попадания в блок (`blockHitStart`/`blockHitStop`) — без SKSE.
 2. `GetAnimationVariableBool("Isblocking")` — только с SKSE (в Papyrus-функции `IsBlocking` нет;

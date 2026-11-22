@@ -17,6 +17,13 @@
 ; Настройка в CK:
 ;   1. Quest мода, алиас на PlayerRef, этот скрипт на алиасе.
 ;   2. Создать GlobalVariable (Short) с EditorID TGCP_PlayerBlocking и указать её в свойстве.
+;
+; Имена событий проверены в игре 22.11.2026 (см. docs/papyrus_verification.md):
+;   blockStart    — ни разу не пришёл;
+;   blockStartOut — пришёл ровно при начале блока (опережает blockStop на длительность блока);
+;   blockStop     — пришёл при завершении блока.
+; Поэтому началом блока считаем любой из blockStart/blockStartOut, а концом — blockStop.
+; В тексте строки лога пишется реальное имя события, чтобы было видно, что сработало.
 
 ScriptName TGCP_PlayerBlockWatcher extends ReferenceAlias
 
@@ -48,6 +55,7 @@ Function Setup()
     EndIf
 
     RegisterForAnimationEvent(player, "blockStart")
+    RegisterForAnimationEvent(player, "blockStartOut")
     RegisterForAnimationEvent(player, "blockStop")
     Registered = True
     Debug.Trace("[TGCP] block watcher registered on " + player)
@@ -58,11 +66,11 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
         Return
     EndIf
 
-    If asEventName == "blockStart"
+    If asEventName == "blockStart" || asEventName == "blockStartOut"
         PlayerBlocking.SetValue(1.0)
-        Debug.Trace("[TGCP] player block start")
+        Debug.Trace("[TGCP] player block start (" + asEventName + ")")
     ElseIf asEventName == "blockStop"
         PlayerBlocking.SetValue(0.0)
-        Debug.Trace("[TGCP] player block stop")
+        Debug.Trace("[TGCP] player block stop (" + asEventName + ")")
     EndIf
 EndEvent
