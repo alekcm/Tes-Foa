@@ -41,6 +41,7 @@ namespace
 	std::atomic<std::uint64_t> g_bashes{ 0 };
 	std::atomic<std::uint64_t> g_powerWindows{ 0 };
 	std::atomic<std::uint64_t> g_rejectLogged{ 0 };
+	std::atomic<std::uint64_t> g_orderedFailed{ 0 };
 
 	struct Buff
 	{
@@ -52,6 +53,8 @@ namespace
 
 	std::vector<Buff> g_buffs;
 	std::unordered_map<RE::FormID, Clock::time_point> g_lastBash;
+	std::unordered_map<RE::FormID, std::vector<std::string>> g_bashEventsByRace;
+	std::atomic<std::uint64_t> g_dumpedRaces{ 0 };
 	std::unordered_map<RE::FormID, Clock::time_point> g_lastPower;
 
 	bool HasShield(RE::Actor* a_actor)
@@ -91,6 +94,61 @@ namespace
 			}
 		}
 		return nullptr;
+	}
+
+	// Имена attack-событий, помеченных в данных расы как bash. Именно эти строки понимает
+	// граф анимаций актёра; "bashStart" добавлен как запасной вариант.
+	const std::vector<std::string>& GetBashEventNames(RE::Actor* a_actor)
+	{
+		static const std::vector<std::string> fallback{ "bashStart", "bash" };
+
+		auto* race = a_actor ? a_actor->GetRace() : nullptr;
+		if (!race) {
+			return fallback;
+		}
+
+		const auto raceID = race->GetFormID();
+		auto it = g_bashEventsByRace.find(raceID);
+		if (it != g_bashEventsByRace.end()) {
+			return it->second;
+		}
+
+		std::vector<std::string> names;
+		std::vector<std::string> dump;
+		if (race->attackDataMap) {
+			for (auto& [event, attackDataPtr] : race->attackDataMap->attackDataMap) {
+				auto* attack = attackDataPtr.get();
+				if (!attack || !event.c_str()) {
+					continue;
+				}
+				const bool isBash = attack->data.flags.any(RE::AttackData::AttackFlag::kBashAttack);
+				if (dump.size() < 20) {
+					dump.push_back(std::format("{} bash={} chance={:.2f}", event.c_str(), isBash, attack->data.attackChance));
+				}
+				if (isBash) {
+					names.push_back(event.c_str());
+				}
+			}
+		}
+
+		if (g_dumpedRaces.fetch_add(1, std::memory_order_relaxed) < 4) {
+			logs::info("race attack data: {} ({}), bash-событий: {}",
+				race->GetName(),
+				race->GetFormID(),
+				names.size());
+			for (const auto& line : dump) {
+				logs::info("  atkd: {}", line);
+			}
+		}
+
+		for (const auto& name : fallback) {
+			if (std::find(names.begin(), names.end(), name) == names.end()) {
+				names.push_back(name);
+			}
+		}
+
+		const auto [inserted, _] = g_bashEventsByRace.emplace(raceID, std::move(names));
+		return inserted->second;
 	}
 
 	RE::TESCombatStyle* GetCombatStyle(RE::Actor* a_actor)
@@ -140,11 +198,32 @@ namespace
 		g_lastBash[actorID] = a_now;
 		g_bashes.fetch_add(1, std::memory_order_relaxed);
 
-		const bool ok = a_actor->NotifyAnimationGraph(RE::BSFixedString("bashStart"));
-		logs::info("bash ordered: actor={} dist={:.0f} sent={} (игрок блокирует без щита)",
-			a_actor->GetName(),
-			a_distance,
-			ok);
+		// Какое из имён примет граф — заранее неизвестно, поэтому перебираем и пишем результат.
+		const auto& names = GetBashEventNames(a_actor);
+		std::string used;
+		for (const auto& name : names) {
+			if (a_actor->NotifyAnimationGraph(RE::BSFixedString(name.c_str()))) {
+				used = name;
+				break;
+			}
+		}
+
+		if (used.empty()) {
+			std::string tried;
+			for (const auto& name : names) {
+				tried += (tried.empty() ? "" : ", ") + name;
+			}
+			logs::info("bash ordered: actor={} dist={:.0f} НЕ ПРИНЯТО ни одно имя [{}] (игрок блокирует без щита)",
+				a_actor->GetName(),
+				a_distance,
+				tried);
+			g_orderedFailed.fetch_add(1, std::memory_order_relaxed);
+		} else {
+			logs::info("bash ordered: actor={} dist={:.0f} event={} sent=true (игрок блокирует без щита)",
+				a_actor->GetName(),
+				a_distance,
+				used);
+		}
 	}
 
 	// Правило 2: щит пробивается силовой атакой булавы/двуручного молота.
