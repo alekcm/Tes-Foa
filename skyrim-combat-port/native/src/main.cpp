@@ -138,7 +138,7 @@ namespace
 			kBashBoostChance,
 			distance);
 
-		return std::max(original, kBashBoostChance);
+		return (std::max)(original, kBashBoostChance);  // скобки: windows.h определяет max как макрос
 	}
 
 	void InstallHook()
