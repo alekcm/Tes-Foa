@@ -96,11 +96,16 @@
 
 **Сначала 20 секунд проверки, что стоит 0.14.0** (иначе правила старые):
 
+Путь к игре содержит пробелы, поэтому **кавычки обязательны** — без них `findstr` читает путь как
+несколько файлов. Проще всего сначала перейти в папку, потом искать по короткому имени:
+
 ```cmd
-findstr /i warhammer "%USERPROFILE%\Documents\My Games\Skyrim Special Edition\Data\SKSE\Plugins\TGCombatPort\Rules.txt"
+cd /d "A:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data\SKSE\Plugins\TGCombatPort"
+findstr /i warhammer Rules.txt
+dir Rules.txt
 ```
 
-Если путь другой — файл лежит в папке игры: `<игра>\Data\SKSE\Plugins\TGCombatPort\Rules.txt`.
+`dir` заодно покажет дату файла — по ней видно, что установилась новая версия, а не остался старый.
 Должны найтись строки с `warhammer` и `twohand-warhammer-breaks-shield-block`.
 
 В логе `<Документы>\My Games\Skyrim Special Edition\SKSE\TGCombatPort.log` при загрузке должно быть:
