@@ -387,6 +387,7 @@ namespace
 		if (!a_player || !a_player->IsBlocking()) {
 			return;
 		}
+		logs::info("block kick: {} → отправляю blockStop", a_why);
 		const bool sent = a_player->NotifyAnimationGraph(RE::BSFixedString("blockStop"));
 		logs::info("block kick: {} → blockStop sent={}", a_why, sent);
 	}
@@ -401,6 +402,7 @@ namespace
 		if (!a_player) {
 			return false;
 		}
+		logs::info("stagger anim: отправляю staggerStart ({})", a_why);
 		const bool sent = a_player->NotifyAnimationGraph(RE::BSFixedString("staggerStart"));
 		logs::info("stagger anim: staggerStart sent={} ({})", sent, a_why);
 		return sent;
@@ -437,6 +439,7 @@ namespace
 			return;
 		}
 
+		logs::info("stagger cast: отправляю каст {} на игрока", g_staggerSpell->GetName());
 		caster->CastSpellImmediate(g_staggerSpell, true, player, 1.0f, false, kStaggerMagnitude, a_source);
 		g_staggers.fetch_add(1, std::memory_order_relaxed);
 		g_lastStagger = Clock::now();
@@ -556,8 +559,7 @@ namespace
 	struct WeaponMatch
 	{
 		RE::WEAPON_TYPE type{ RE::WEAPON_TYPE::kHandToHandMelee };
-		RE::FormID      keyword{ 0 };       // 0 — кейворд не нужен
-		std::string     keywordText;
+		std::string     keywordText;  // обязательный кейворд (WeapTypeWarhammer); пусто = не нужен
 	};
 
 	struct Rule
@@ -991,10 +993,8 @@ namespace
 				}
 				// Допущение AS-20: кейворды WeapTypeBattleaxe и WeapTypeWarhammer есть в
 				// Skyrim.esm и висят на двуручном оружии (так их используют ванильные перки).
-				// Опечатка в имени кейворда должна выключать правило громко, а не молча.
-				if (!match.keywordText.empty() && !ResolveForm(match.keywordText, match.keyword)) {
-					return false;
-				}
+				// FormID здесь НЕ ищем: на загрузке LookupByEditorID их не находит (лог 0.14.0:
+				// «не понял attacker.weapon = warhammer»), а сравнение по имени работает в бою.
 				a_rule.weapons.push_back(match);
 			}
 			return true;
@@ -1046,7 +1046,7 @@ namespace
 		power.triggers = kTriggerHit;
 		power.hitRequire = static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked) |
 			static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kPowerAttack);
-		power.weapons = { WeaponMatch{ RE::WEAPON_TYPE::kOneHandMace, 0, "" } };
+		power.weapons = { WeaponMatch{ RE::WEAPON_TYPE::kOneHandMace, "" } };
 		power.playerBlocking = Tri::kYes;
 		power.playerShield = Tri::kYes;
 		power.effects = { EffectId::kUnblock, EffectId::kStagger };
@@ -1215,9 +1215,10 @@ namespace
 			const bool matched = std::any_of(
 				a_rule.weapons.begin(), a_rule.weapons.end(), [weapon, type](const WeaponMatch& a_match) {
 					// Тип движка у двуручного топора и молота общий, поэтому при заданном
-					// кейворде проверяем именно его (BGSKeywordForm::HasKeywordID).
+					// кейворде проверяем именно его: BGSKeywordForm::HasKeywordString
+					// (BGSKeywordForm.h:37) сравнивает editor ID, FormID не нужен.
 					return a_match.type == type &&
-						(a_match.keyword == 0 || weapon->HasKeywordID(a_match.keyword));
+						(a_match.keywordText.empty() || weapon->HasKeywordString(a_match.keywordText));
 				});
 			if (!matched) {
 				return false;
@@ -1273,6 +1274,7 @@ namespace
 			// Урон сквозь блок: блок остаётся на месте, оглушения нет (укол кинжала/меча).
 			// DamageActorValue из ActorValueOwner — урон идёт мимо блокировки.
 			if (player && a_rule.chip > 0.0f) {
+				logs::info("chip: наношу {:.1f} hp ({})", a_rule.chip, a_why);
 				player->DamageActorValue(RE::ActorValue::kHealth, a_rule.chip);
 				logs::info("chip: {:.1f} hp сквозь блок ({})", a_rule.chip, a_why);
 			}
@@ -1413,6 +1415,20 @@ namespace
 			const auto* heavyBlunt = GetHeavyBlunt(a_attacker);
 			if (heavyBlunt) {
 				logs::info("hit: у бьющего тяжёлое дробящее — {}", heavyBlunt->GetName());
+			}
+			if (const auto* weapon = GetEquippedWeapon(a_attacker)) {
+				std::string keywords;
+				weapon->ForEachKeyword([&keywords](RE::BGSKeyword* a_keyword) {
+					if (a_keyword) {
+						const auto* edid = a_keyword->GetFormEditorID();
+						keywords += edid ? edid : "?";
+						keywords += std::format("({:08X}) ", a_keyword->GetFormID());
+					}
+					return RE::BSContainer::ForEachResult::kContinue;
+				});
+				logs::info("hit: оружие {} ({:08X}) тип={} кейворды: {}",
+					weapon->GetName(), weapon->GetFormID(), static_cast<int>(weapon->GetWeaponType()),
+					keywords.empty() ? "нет" : keywords);
 			}
 		}
 
@@ -1739,6 +1755,10 @@ namespace
 SKSE_PLUGIN_LOAD(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
+
+	// Каждая строка лога сразу пишется на диск: после вылета в файле остаётся последняя
+	// выполненная строка, и по ней видно, на каком вызове движка игра упала.
+	spdlog::flush_on(spdlog::level::trace);
 
 	const auto version = a_skse->RuntimeVersion();
 	logs::info("TGCombatPort native loaded, runtime {}.{}.{}.{} (без хуков)"sv,

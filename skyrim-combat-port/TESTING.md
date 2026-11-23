@@ -139,3 +139,14 @@ ID берём **из своей игры**, а не из моей памяти:
 Если после `equipitem` оружие не сменилось — повторить `equipitem <ID> 1` (без `right`).
 Если в логе `hit:` показывает `source=`, но правило молота не срабатывает — значит у этого оружия нет
 кейворда `WeapTypeWarhammer`; тогда пиши, какое это оружие, и я посмотрю по его записи.
+
+## Изоляция вылета «игра закрылась при замахе» (CR)
+
+В логе сессии 12 (0.14.0) нет ни одной строки `hit:` — значит до кода правил дело не дошло.
+Проверяем по порядку, каждый шаг 2–3 минуты.
+
+| ID | Шаги | Что значит результат |
+|---|---|---|
+| CR-01 | Убрать анимацию укола (две папки, игра не нужна): `rmdir /s /q "<игра>\Data\meshes\actors\character\animations\DynamicAnimationReplacer\_CustomConditions\90001"` и то же для `...\character\_1stperson\animations\DynamicAnimationReplacer\_CustomConditions\90001`. Повторить бой с тем же врагом | Не вылетает → виновата анимация; вернём только вид от первого лица |
+| CR-02 | Если вылет остался: в PowerShell `Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Application Error'} -MaxEvents 1 | Format-List TimeCreated,Message` | В строке `Faulting module name` видно, чей это код: `TGCombatPort.dll` — наш, `SkyrimSE.exe` — движок/другой мод |
+| CR-03 | В логе после вылета смотреть **последнюю** строку (0.14.1 пишет на диск сразу) | Строка `отправляю staggerStart` / `отправляю blockStop` / `отправляю каст` / `chip: наношу` — точное место вылета |
