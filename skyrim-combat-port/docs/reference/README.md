@@ -36,7 +36,8 @@
 | [`wildcat-analysis.md`](wildcat-analysis.md) | что реально делает `Wildcat - Combat of Skyrim.esp`: части тела, ранения, стаггер, переопределённые `GMST` (разбор парсером `tools/esp_dump.py`) |
 | [`../weapons-and-effects.md`](../weapons-and-effects.md) | справочник «оружие → что пробивает → какой эффект» |
 | [`../enemy-spells.md`](../enemy-spells.md) | свои заклинания противников: 13 штук, телеграф, два ответа, потолок урона |
-| [`../combat-audit.md`](../combat-audit.md) | регистр решений: правки правил, шесть рычагов, что отклонено и почему |
+| [`../combat-audit.md`](../combat-audit.md) | **аудит боёвки**: оружие → что пробивает → эффект, атаки врагов, эффекты плагина, числа движка, что есть в коде |
+| [`../combat-block-matrix.md`](../combat-block-matrix.md) | **матрица**: четыре состояния защиты, 18 глаголов атак, все враги по семействам, травмы и части тела |
 | [`apocalypse-spells.md`](apocalypse-spells.md) | что делает каждое заклинание Apocalypse 9.45.0 (описания мода, сверенные с `.esp`) |
 | [`wiki/`](wiki/README.md) | локальная копия нужных страниц UESP и CK Wiki (цитаты) |
 
@@ -48,6 +49,8 @@
 |---|---|
 | `python tools/verify_api.py --clone --methods` | каждый символ `RE::…` и каждый вызываемый метод существуют в закреплённых заголовках CommonLibSSE-NG |
 | `python tools/verify_audit.py` | каждая функция C++ описана в `CODE_AUDIT.md`; каждая метка `AS-n` в коде есть в реестре и имеет способ проверки |
+| `python tools/check_api_usage.py --headers <include CommonLib>` | каждое `RE::Имя` в `native/src/main.cpp` объявлено в закреплённых заголовках; печатает файл:строку |
+| `python tools/check_rules.py` | `Rules.txt`: ключи, значения, оружие, эффекты, секция `[settings]` — по спискам из кода |
 | `python tools/esp_dump.py <файл.esp> --type SPEL` | записи и числа из любого мода: заклинания, эффекты, `GMST`, ключевые слова — чтобы брать числа из данных, а не из головы |
 
 Если появляется выдуманная функция движка (`Actor::SetStaggered`) или неописанная функция в коде —
