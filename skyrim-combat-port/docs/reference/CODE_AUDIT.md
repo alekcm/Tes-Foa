@@ -46,7 +46,8 @@
 | `RuleMatches` | условия правила: флаги попадания, щит, блок, тип оружия, дистанция | `AS-5` | `rule fired:` появляется только при подходящих условиях |
 | `RuleOnCooldown` | своя логика (поле `cooldown`) | — | повторные попадания подряд не спамят эффектом |
 | `ScheduleProbes` | пробы блока после эффекта | `AS-7` | `block probe: …` |
-| `RunEffect` | таблица эффектов: `stagger` → `ApplyStagger`, `unblock` → `KickBlock`, `bash` → `OrderBash` **[A]** | `AS-10` | `rule fired: … effects=unblock,stagger` |
+| `RunEffect` | ставит эффект в очередь на следующий кадр (`SKSE::GetTaskInterface()->AddTask`), сразу обновляет только состояние дезориентации и пробы **[A]** | `AS-10` | строки `эффект <правило> → применяю (следующий кадр)` |
+| `RunEffectNow` | таблица эффектов, выполняется уже вне обработчика `TESHitEvent`: `stagger` → `Stagger`, `unblock` → `KickBlock`, `chip` → `DamageActorValue`, `bash` → `OrderBash` **[A]** | `AS-10` | `stagger anim: отправляю …`, `block kick: … отправляю blockStop`, `chip: наношу …` |
 | `FireRule` | применение эффектов по порядку + кулдаун правила | — | `rule fired: [имя] via=попадание|заказ` |
 | `ProcessPendingFires` | отложенный запуск правила на заказ баша | `AS-3` | `rule fired: … via=заказ` или `rule skipped: …` |
 | `StaggerByGraph` | `Actor::NotifyAnimationGraph("staggerStart")` — собственное состояние стаггера графа **[A]** (тег — по факту из лога) | `AS-14` | `stagger anim: staggerStart sent=true` |

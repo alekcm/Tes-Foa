@@ -1254,10 +1254,12 @@ namespace
 		}
 	}
 
-	void RunEffect(EffectId a_effect, RE::Actor* a_source, const Rule& a_rule)
+	// Само действие. Вызывается НЕ из обработчика события попадания, а задачей на следующий
+	// кадр: вызовы графа анимации и каста изнутри TESHitEvent — это вход в движок, который в этот
+	// момент сам обрабатывает удар, и повторный вход в граф (staggerStart/blockStop) роняет игру.
+	void RunEffectNow(EffectId a_effect, RE::Actor* a_source, const std::string& a_why, float a_chip)
 	{
-		auto*     player = RE::PlayerCharacter::GetSingleton();
-		const std::string a_why = a_rule.name;
+		auto* player = RE::PlayerCharacter::GetSingleton();
 		switch (a_effect) {
 		case EffectId::kStagger:
 			Stagger(a_source, a_why);
@@ -1273,19 +1275,53 @@ namespace
 		case EffectId::kChip:
 			// Урон сквозь блок: блок остаётся на месте, оглушения нет (укол кинжала/меча).
 			// DamageActorValue из ActorValueOwner — урон идёт мимо блокировки.
-			if (player && a_rule.chip > 0.0f) {
-				logs::info("chip: наношу {:.1f} hp ({})", a_rule.chip, a_why);
-				player->DamageActorValue(RE::ActorValue::kHealth, a_rule.chip);
-				logs::info("chip: {:.1f} hp сквозь блок ({})", a_rule.chip, a_why);
+			if (player && a_chip > 0.0f) {
+				logs::info("chip: наношу {:.1f} hp ({})", a_chip, a_why);
+				player->DamageActorValue(RE::ActorValue::kHealth, a_chip);
+				logs::info("chip: {:.1f} hp сквозь блок ({})", a_chip, a_why);
 			}
 			break;
 		}
+	}
+
+	// Планировщик: эффект ставится в очередь и выполняется на следующем кадре.
+	// Состояние (дезориентация, пробы) обновляем сразу — оно ни к чему в движке не обращается.
+	void RunEffect(EffectId a_effect, RE::Actor* a_source, const Rule& a_rule)
+	{
 		if (a_effect == EffectId::kUnblock || a_effect == EffectId::kStagger) {
 			g_disorientUntil = Clock::now() +
 				std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kDisorientSeconds));
 			g_disorientKicks = 0;
 		}
-		ScheduleProbes(a_why, a_effect == EffectId::kUnblock);
+		ScheduleProbes(a_rule.name, a_effect == EffectId::kUnblock);
+
+		if (!a_source) {
+			return;
+		}
+		struct Pending
+		{
+			EffectId        effect;
+			RE::ActorHandle source;
+			std::string     why;
+			float           chip;
+		};
+		Pending pending{ a_effect, a_source->GetHandle(), a_rule.name, a_rule.chip };
+		auto*   tasks = SKSE::GetTaskInterface();
+		if (!tasks) {
+			logs::warn("эффект {} применён немедленно: очереди задач нет", a_rule.name);
+			RunEffectNow(a_effect, a_source, a_rule.name, a_rule.chip);
+			return;
+		}
+		tasks->AddTask([pending]() {
+			auto* player = RE::PlayerCharacter::GetSingleton();
+			auto  handle = pending.source.get();
+			if (!player || !handle) {
+				logs::info("эффект {} пропущен: актёр или игрок недоступен", pending.why);
+				return;
+			}
+			logs::info("эффект {} → применяю (следующий кадр)", pending.why);
+			RunEffectNow(pending.effect, handle.get(), pending.why, pending.chip);
+		});
 	}
 
 	void FireRule(Rule& a_rule, RE::Actor* a_source, const char* a_via)
