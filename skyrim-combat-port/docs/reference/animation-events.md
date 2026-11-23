@@ -39,7 +39,7 @@
 | `bashStop` | **да** | каждый заказ баша в логах 0.5.0–0.6.2 дает строку `bandit anim: bashStop` **[A]** |
 | `bashStart` | **нет** | 0.6.2: 5 заказов → 5 `bashStop`, `bashStart` не пришёл ни разу **[A]** |
 | `attackStop` | да | лог 0.2.1 **[A]** |
-| `blockStop`, `blockStartOut`, `preHitFrame`, `weaponSwing`, `weaponDraw`, `IdleStop` | да | Papyrus-пробник, `docs/papyrus_verification.md` **[A]** |
+| `blockStop`, `blockStartOut`, `preHitFrame`, `weaponSwing`, `weaponDraw`, `IdleStop` | да | Papyrus-пробник, наши логи **[A]** |
 | `attackPowerStart*`, `bashPowerStart` | ожидается да (на них подписан 0.7.0) | **ещё не измерено** **[D]** |
 
 Вывод, на котором построена 0.7.0: **триггер механики нельзя вешать на `bashStart`** — событие не рассылается.

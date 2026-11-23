@@ -7,7 +7,7 @@
 3. **File → Add local repository…** → выбери папку `skyrim-combat-port`. Если Git ещё не инициализирован, нажми предложенную кнопку **create a repository**.
 4. В поле Summary напиши `Add combat design and handoff`; нажми **Commit to main**.
 5. Нажми **Publish repository**, выбери созданный репозиторий/имя и нажми Publish.
-6. Открой GitHub и проверь, что видны `README.md`, `AGENT_TASK.md`, `SETUP.md`, `docs/`, `data/`.
+6. Открой GitHub и проверь, что видны `README.md`, `SETUP.md`, `docs/`, `data/`.
 
 ## Вариант B — терминал Git
 
@@ -21,7 +21,7 @@ cd /d "%USERPROFILE%\Downloads\skyrim-combat-port"
 # cd "$HOME/Downloads/skyrim-combat-port"
 
 git init -b master
-git add README.md AGENT_TASK.md SETUP.md DEPENDENCIES.md STATUS.md PUBLISH.md .gitignore .gitattributes docs data
+git add README.md SETUP.md DEPENDENCIES.md PUBLISH.md .gitignore .gitattributes docs data
 git status --short
 # Проверь, что в выводе есть оба файла data/:
 # data/combat_tables_phases_1-2.xlsx и data/phases_1-2_coverage.json
@@ -57,7 +57,7 @@ git push
 3. В строке рядом с полем ввода выбери **GitHub** и пройди OAuth-подключение.
 4. В **Manage repositories** разреши доступ к этому конкретному репозиторию.
 5. Выбери репозиторий и ветку для coding-сессии; включи GitHub connector для этого задания.
-6. Дай задачу, например: «Прочитай `AGENT_TASK.md`, затем README и связанные документы. Работай в этой ветке. Сначала проверь `SETUP.md` и сообщи, какие тесты реально доступны».
+6. Дай задачу, например: «Прочитай `README.md`, `docs/combat-audit.md`, `docs/combat-block-matrix.md`. Работай в этой ветке. Сначала проверь `SETUP.md` и сообщи, какие проверки реально доступны».
 7. Смотри правки в **Diff**. Если агент создал PR, проверь его перед merge. В справке Arena сказано, что сессия поддерживает один PR; после merge/закрытия PR эта сессия больше не может пушить новые изменения.
 
 Ссылки на официальную инструкцию Arena: https://help.arena.ai/articles/1655691990-how-to-use-coding-in-agent-mode и https://arena.ai/blog/coding-in-agent-mode.

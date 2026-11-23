@@ -2,7 +2,7 @@
 
 **Что это.** Справочник фактов: какое оружие что пробивает, какой эффект даёт, чем это задано в коде
 и чем подтверждено. Его можно целиком скинуть в новый чат — по нему видно модель боя без истории
-переписки. Дневник работ и решений — в [`../STATUS.md`](../STATUS.md), здесь его нет.
+переписки. Истории работ здесь нет намеренно.
 
 **Как читать.**
 
@@ -25,16 +25,16 @@
 
 | Оружие | Лёгкая | Силовая (зажатие) | S1 | S2 | S3 | Эффект | Правило в `Rules.txt` | Статус |
 |---|---|---|---|---|---|---|---|---|
-| Кинжал | `slash` режет | `thrust` укол | ×10 | ×10 | ×6 | урон сквозь блок, блок не снимает, оглушения нет | `dagger-thrust-through-any-block`, `dagger-thrust-through-ward` | 0.13.0, не проверено |
-| Меч 1H | `slash` | `thrust` | ×8 | — | — | урон сквозь блок оружием | `sword-thrust-through-weapon-block` | 0.13.0, не проверено |
+| Кинжал | `slash` режет | `thrust` укол | ×10 | ×10 | ×6 | урон сквозь блок, блок не снимает, оглушения нет | `dagger-thrust-through-any-block`, `dagger-thrust-through-ward` | не проверено в игре |
+| Меч 1H | `slash` | `thrust` | ×8 | — | — | урон сквозь блок оружием | `sword-thrust-through-weapon-block` | не проверено в игре |
 | Топор 1H | `slash` | `chop` | — | — | — | **никаких**: ни оглушения, ни пробития (решение 22.11) | нет | по решению |
-| Булава 1H | `blunt` | `bluntHeavy` | 💥 | 💥 | — | оглушение; единственное одноручное, ломающее щит силовой | `onehand-mace-power-breaks-shield-block` | есть (0.10.0) |
+| Булава 1H | `blunt` | `bluntHeavy` | 💥 | 💥 | — | оглушение; единственное одноручное, ломающее щит силовой | `onehand-mace-power-breaks-shield-block` | проверено логом |
 | Двуручный меч | `sweep` | широкий выпад по площади | — | — | — | высокий урон нескольким целям, **без эффектов**, блок оружием не пробивает | нет | по решению |
 | Двуручный топор | `sweep` | `chop` | — | — | — | урон + **травма** (`wound`), без оглушения | нет | `wound` — план |
-| Двуручный молот | `blunt` | `hammerHeavy` | 💥 | 💥 | — | оглушение, ломает и щит | `twohand-warhammer-breaks-shield-block` | 0.14.0, не проверено |
+| Двуручный молот | `blunt` | `hammerHeavy` | 💥 | 💥 | — | оглушение, ломает и щит | `twohand-warhammer-breaks-shield-block` | не проверено в игре |
 | Кулаки | слабый `blunt` | без изменений | — | — | — | ничего | нет | — |
-| Лук / арбалет | `arrow` / `bolt` | — | ×8 | — | — | прострел блока оружием, щит держит | `arrow-and-bolt-through-weapon-block` | 0.13.0, не проверено |
-| Магия | `spell` | — | ×6 | — | — | вся магия проходит блок оружием | `spell-through-weapon-block` | 0.13.0, не проверено |
+| Лук / арбалет | `arrow` / `bolt` | — | ×8 | — | — | прострел блока оружием, щит держит | `arrow-and-bolt-through-weapon-block` | не проверено в игре |
+| Магия | `spell` | — | ×6 | — | — | вся магия проходит блок оружием | `spell-through-weapon-block` | не проверено в игре |
 
 Ключ к «не перетанковывать»: у игрока **три разных ответа** на три разных защиты — укол (сквозь
 оружие), булава (ломает оружие), молот (ломает щит). Пока это работает, бой — не «зажать атаку»,
@@ -42,7 +42,7 @@
 
 **Разделение двуручного топора и молота.** Движок отдаёт им один тип `WEAPON_TYPE::kTwoHandAxe = 6`
 (`RE/T/TESObjectWEAP.h:44-57`) **[A]**, но различают их кейворды — так же, как ванильные перки:
-`WeapTypeBattleaxe` и `WeapTypeWarhammer`. В плагине с 0.14.0 `attacker.weapon = warhammer` ищется
+`WeapTypeBattleaxe` и `WeapTypeWarhammer`. В плагине `attacker.weapon = warhammer` ищется
 через `BGSKeywordForm::HasKeywordString` (`BGSKeywordForm.h:37`) **[A]**, `battleaxe` — по своему
 кейворду.
 
@@ -87,7 +87,7 @@
 |---|---|---|---|
 | `unblock` | снимает блок и держит его снятым всё окно дезориентации (1,2 с, до 6 повторов) | `PlayerCharacter::NotifyAnimationGraph("blockStop")` **[A: лог 0.6.2–0.9.0, `blockStop sent=true`]** | есть, проверено |
 | `stagger` | стаггер без урона и без визуальных эффектов | каст спелла-стаггера от лица NPC, `MagicCaster::CastSpellImmediate` **[A: лог 0.7.1/0.8.0]** | есть, проверено |
-| `chip` | снимает N здоровья сквозь блок, блок остаётся | `ActorValueOwner::DamageActorValue(kHealth, N)` **[A: заголовки]** | есть с 0.11.0, в игре не проверено |
+| `chip` | снимает N здоровья сквозь блок, блок остаётся | `ActorValueOwner::DamageActorValue(kHealth, N)` **[A: заголовки]** | есть, в игре не проверено |
 | `bash` | заказывает NPC баш через граф | `Actor::NotifyAnimationGraph("bashStart"/"bashPowerStart")` **[A: лог 0.4.0–0.9.0]** | есть, проверено |
 | `bleed` | урон по времени | повторный `DamageActorValue` | план |
 | `wound` | травма части тела | нужен Precision API (кости: `NPC Head [Head]`, `NPC R Forearm [RLar]`) **[A: исходники PrecisionLocationalDamage]** | план |
@@ -139,14 +139,14 @@
 
 ## 6. Что есть в коде, а чего нет
 
-| Механика | Статус на 0.15.0 |
+| Механика | Статус |
 |---|---|
 | Условия: `trigger`, `hit-flags`, `attack.kind`, `attacker.race`, `attacker.weapon` (с кейвордами), `attacker.shield`, `player.blocking`, `player.shield`, `player.ward`, `hit.source`, `reach` | есть |
 | `hit.projectile = any/none` (снаряд против AoE) | **нет** — нужна правка кода |
 | Эффекты `unblock`, `stagger`, `chip`, `bash` | есть |
 | Эффекты `bleed`, `wound`, `disarm`, `dispelward` | **нет** — план |
 | Свои заклинания врагов (13) | **нет** — план, [`enemy-spells.md`](enemy-spells.md) |
-| `[settings] effects = off` — правила считаются, движок не трогается | есть с 0.15.0 |
+| `[settings] effects = off` — правила считаются, движок не трогается | есть |
 | Перехват кода движка (хуки) | **запрещено**: вылет в 0.1.1 на `write_branch` в `Actor::GetAttackChance` **[A: лог]** |
 
 ---
