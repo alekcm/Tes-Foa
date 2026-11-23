@@ -39,6 +39,7 @@
 | [`../combat-audit.md`](../combat-audit.md) | **аудит боёвки**: оружие → что пробивает → эффект, атаки врагов, эффекты плагина, числа движка, что есть в коде |
 | [`../combat-block-matrix.md`](../combat-block-matrix.md) | **матрица**: четыре состояния защиты, 18 глаголов атак, все враги по семействам, травмы и части тела |
 | [`apocalypse-spells.md`](apocalypse-spells.md) | что делает каждое заклинание Apocalypse 9.45.0 (описания мода, сверенные с `.esp`) |
+| [`apocalypse-analysis.md`](apocalypse-analysis.md) | что внутри `.esp` Apocalypse, как парсить школу/тип/уровень, где NPC-версии заклинаний |
 | [`wiki/`](wiki/README.md) | локальная копия нужных страниц UESP и CK Wiki (цитаты) |
 
 ## Машиночитаемые проверки
