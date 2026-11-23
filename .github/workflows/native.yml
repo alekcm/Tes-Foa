@@ -45,8 +45,16 @@ jobs:
       - name: Check engine API usage
         shell: pwsh
         run: |
-          python ../tools/check_api_usage.py --headers lib/commonlibsse-ng/include --quiet
-          if ($LASTEXITCODE -ne 0) { throw "check_api_usage failed: $LASTEXITCODE" }
+          # Вывод печатаем аннотациями при падении: логи Actions лежат на blob-хосте,
+          # который из песочницы агента недоступен, а annotations читаются через API.
+          $env:PYTHONIOENCODING = 'utf-8'
+          $out = @(python ../tools/check_api_usage.py --headers lib/commonlibsse-ng/include --quiet 2>&1)
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $out | Select-Object -First 15 | ForEach-Object { Write-Output ("::error::" + ($_ -replace "`r", "")) }
+            throw "check_api_usage failed: $code"
+          }
+          Write-Output ($out | Select-Object -Last 1)
 
       - name: Build
         shell: pwsh

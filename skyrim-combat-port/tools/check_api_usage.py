@@ -131,6 +131,11 @@ def check(source: Path, headers: Headers) -> tuple[list[str], list[str]]:
 
 
 def main() -> int:
+    # Консоль Windows может быть в cp1252 — без этого печать кириллицы падает.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
     parser = argparse.ArgumentParser(description="Сверить вызовы движка в main.cpp с заголовками CommonLib.")
     parser.add_argument("--headers", required=True, help="путь к include/ из CommonLibSSE-NG")
     parser.add_argument("--source", default=str(SOURCE), help="файл плагина (по умолчанию main.cpp)")
