@@ -80,7 +80,11 @@ Howling Blast; молния — Rift Bolt/Thundercrack/Electrosphere/Scattershoc
 | 75 | Conjure Dremora Champion 366, Conjure Dremora Honor Guard 380, Conjure Herne 394, Conjure Xivilai Lord 344 |
 | 100 | Conjure Dremora Assassin 1201, Conjure Weeping Daedra 584, Conjure Lord of Bindings 1261, Conjure Nether Lich 1441 |
 
-## 4. Кому что давать: решение
+## 4. Кому что давать — ОТМЕНЕНО 22.11.2026
+
+Раздел оставлен как история решения. Пользователь постановил: **заклинания противников пишем сами,
+с нуля** (`docs/enemy-spells.md`), а Apocalypse остаётся источником идей и арта. Ниже — прежний
+вариант «выдать врагам чужие спеллы», он больше не действует.
 
 Ниже — по одной строке на класс врага. Формат — будущий вид таблицы данных
 (`native/rules/spellbook.txt`), которую будет читать плагин. **Код чтения пока не написан** —

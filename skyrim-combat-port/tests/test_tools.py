@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,7 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
+TOOLS = ROOT / "tools"
 sys.path.insert(0, str(ROOT / "tools"))
 
 import build  # noqa: E402
@@ -23,6 +25,7 @@ import collect_logs  # noqa: E402
 import enable_plugin  # noqa: E402
 import esp_dump  # noqa: E402
 import check_env  # noqa: E402
+import check_rules  # noqa: E402
 import inspect_plugin  # noqa: E402
 import inspect_records  # noqa: E402
 import package  # noqa: E402
@@ -839,3 +842,89 @@ class ThrustAnimationAssetsTests(unittest.TestCase):
         workflow = path.read_text(encoding="utf-8")
         self.assertIn("Copy-Item -Recurse $animSource pkg/", workflow)
         self.assertIn("анимация укола не попала в версию", workflow)
+
+class RulesFileTests(unittest.TestCase):
+    """Опечатка в правиле = правило молча выключится в игре, поэтому проверяем здесь."""
+
+    def test_repository_rules_are_valid(self) -> None:
+        text = (ROOT / "native" / "rules" / "Rules.txt").read_text(encoding="utf-8")
+        problems, names = check_rules.check_text(text)
+        self.assertEqual(problems, [])
+        self.assertIn("arrow-and-bolt-through-weapon-block", names)
+        self.assertIn("spell-through-weapon-block", names)
+
+    def test_unknown_weapon_is_reported(self) -> None:
+        problems, _ = check_rules.check_text("[x]\nattacker.weapon = halberd\n")
+        self.assertTrue(any("halberd" in problem for problem in problems))
+
+    def test_unknown_key_is_reported(self) -> None:
+        problems, _ = check_rules.check_text("[x]\nplayer.blokcing = yes\n")
+        self.assertTrue(any("неизвестный ключ" in problem for problem in problems))
+
+    def test_bad_tri_state_is_reported(self) -> None:
+        problems, _ = check_rules.check_text("[x]\nplayer.shield = maybe\n")
+        self.assertTrue(any("yes/no/any" in problem for problem in problems))
+
+class WeaponTableTests(unittest.TestCase):
+    """Список оружия в main.cpp и в валидаторе правил должен совпадать, иначе опечатка пройдёт."""
+
+    def test_python_validator_matches_cpp_table(self) -> None:
+        source = (ROOT / "native" / "src" / "main.cpp").read_text(encoding="utf-8")
+        # Записи таблицы вида { "mace", RE::WEAPON_TYPE::kOneHandMace, nullptr },
+        ids = set(re.findall(r'\{\s*"([a-z]+)",\s*RE::WEAPON_TYPE::k\w+', source))
+        ids.discard("any")
+        self.assertEqual(ids, check_rules.WEAPONS)
+
+    def test_warhammer_uses_keyword(self) -> None:
+        source = (ROOT / "native" / "src" / "main.cpp").read_text(encoding="utf-8")
+        self.assertIn('"warhammer", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeWarhammer"', source)
+        self.assertIn('"battleaxe", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeBattleaxe"', source)
+
+class SettingsSectionTests(unittest.TestCase):
+    """[settings] — не правило, а переключатели; опечатки в них тоже ловятся."""
+
+    def test_settings_section_is_not_a_rule(self) -> None:
+        problems, names = check_rules.check_text("[settings]\neffects = on\n\n[rule-a]\ntrigger = hit\n")
+        self.assertEqual(problems, [])
+        self.assertEqual(names, ["rule-a"])
+
+    def test_settings_effects_off_is_allowed(self) -> None:
+        problems, _ = check_rules.check_text("[settings]\neffects = off\n")
+        self.assertEqual(problems, [])
+
+    def test_settings_rejects_unknown_value(self) -> None:
+        problems, _ = check_rules.check_text("[settings]\neffects = maybe\n")
+        self.assertTrue(any("effects" in problem for problem in problems))
+
+    def test_settings_rejects_unknown_key(self) -> None:
+        problems, _ = check_rules.check_text("[settings]\nstagger = on\n")
+        self.assertTrue(any("stagger" in problem for problem in problems))
+
+    def test_shipped_rules_have_no_errors(self) -> None:
+        path = ROOT / "native" / "rules" / "Rules.txt"
+        problems, names = check_rules.check_text(path.read_text(encoding="utf-8"))
+        self.assertEqual(problems, [])
+        self.assertEqual(len(names), 8)
+
+
+class ApiUsageToolTests(unittest.TestCase):
+    """Проверка вызовов движка по заголовкам: инструмент обязан ругаться на неверный путь."""
+
+    def test_help(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(TOOLS / "check_api_usage.py"), "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("--headers", result.stdout)
+
+    def test_missing_header_dir(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(TOOLS / "check_api_usage.py"), "--headers", "/nonexistent-dir-xyz"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)

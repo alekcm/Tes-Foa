@@ -387,23 +387,9 @@ namespace
 		if (!a_player || !a_player->IsBlocking()) {
 			return;
 		}
+		logs::info("block kick: {} → отправляю blockStop", a_why);
 		const bool sent = a_player->NotifyAnimationGraph(RE::BSFixedString("blockStop"));
 		logs::info("block kick: {} → blockStop sent={}", a_why, sent);
-	}
-
-	// Основной способ: переводим игрока в собственное состояние стаггера графа (staggerStart).
-	// Это то состояние, которым движок сам прерывает действия (UESP: «Staggering interrupts
-	// whatever action was being taken by the target»), и в отличие от спелла оно не даёт
-	// ни урона, ни эффектов на земле (лог 0.7.2: «Топот великана» бил игрока и рисовал разлом).
-	// Допущение AS-14.
-	bool StaggerByGraph(RE::PlayerCharacter* a_player, const std::string& a_why)
-	{
-		if (!a_player) {
-			return false;
-		}
-		const bool sent = a_player->NotifyAnimationGraph(RE::BSFixedString("staggerStart"));
-		logs::info("stagger anim: staggerStart sent={} ({})", sent, a_why);
-		return sent;
 	}
 
 	// Накладываем стаггер на игрока от имени NPC: caster — сам NPC, target — игрок.
@@ -411,12 +397,13 @@ namespace
 	// (AS-10, KickBlock). Подтверждены: AS-2 (стаггер виден), AS-4 (каст без анимации).
 	// Эффект stagger: сначала состояние графа (без урона и визуальных эффектов),
 	// и только если граф отказал — спелл-стаггер.
+	// Стаггер ставим ТОЛЬКО проверенным путём — кастом существующего спелла от лица NPC.
+	// Этот путь подтверждён логами 0.7.1/0.8.0 («stagger cast: … каст прошёл, блок снят»).
+	// Попытка через NotifyAnimationGraph("staggerStart") убрана в 0.15.0: она не дала ни одной
+	// строки «sent=true» ни в одном логе, то есть ни разу не сработала, и это единственный
+	// вызов движка на пути попадания, у которого нет подтверждения работоспособности.
 	void Stagger(RE::Actor* a_source, const std::string& a_why)
 	{
-		auto* player = RE::PlayerCharacter::GetSingleton();
-		if (StaggerByGraph(player, a_why)) {
-			return;
-		}
 		ApplyStagger(a_source, a_why.c_str());
 	}
 
@@ -437,6 +424,7 @@ namespace
 			return;
 		}
 
+		logs::info("stagger cast: отправляю каст {} на игрока", g_staggerSpell->GetName());
 		caster->CastSpellImmediate(g_staggerSpell, true, player, 1.0f, false, kStaggerMagnitude, a_source);
 		g_staggers.fetch_add(1, std::memory_order_relaxed);
 		g_lastStagger = Clock::now();
@@ -505,23 +493,30 @@ namespace
 		{ "chip", EffectId::kChip },        // урон сквозь блок (AS-16): блок остаётся, оглушения нет
 	};
 
+	// Оружие из файла правил. Тип движка у двуручного топора и двуручного молота ОДИН
+	// (kTwoHandAxe = 6, RE/T/TESObjectWEAP.h), поэтому они различаются кейвордом, как и в
+	// ванильных перках: WeapTypeBattleaxe против WeapTypeWarhammer.
+	// Проверено по заголовкам: TESObjectWEAP наследует BGSKeywordForm
+	// (RE/T/TESObjectWEAP.h:74), у него есть HasKeywordID (RE/B/BGSKeywordForm.h:36).
 	struct WeaponDef
 	{
 		const char*     id;
 		RE::WEAPON_TYPE type;
+		const char*     keyword;
 	};
 
 	constexpr WeaponDef kWeaponTable[] = {
-		{ "fists", RE::WEAPON_TYPE::kHandToHandMelee },
-		{ "sword", RE::WEAPON_TYPE::kOneHandSword },
-		{ "dagger", RE::WEAPON_TYPE::kOneHandDagger },
-		{ "axe", RE::WEAPON_TYPE::kOneHandAxe },
-		{ "mace", RE::WEAPON_TYPE::kOneHandMace },
-		{ "greatsword", RE::WEAPON_TYPE::kTwoHandSword },
-		{ "battleaxe", RE::WEAPON_TYPE::kTwoHandAxe },
-		{ "bow", RE::WEAPON_TYPE::kBow },
-		{ "staff", RE::WEAPON_TYPE::kStaff },
-		{ "crossbow", RE::WEAPON_TYPE::kCrossbow },
+		{ "fists", RE::WEAPON_TYPE::kHandToHandMelee, nullptr },
+		{ "sword", RE::WEAPON_TYPE::kOneHandSword, nullptr },
+		{ "dagger", RE::WEAPON_TYPE::kOneHandDagger, nullptr },
+		{ "axe", RE::WEAPON_TYPE::kOneHandAxe, nullptr },
+		{ "mace", RE::WEAPON_TYPE::kOneHandMace, nullptr },
+		{ "greatsword", RE::WEAPON_TYPE::kTwoHandSword, nullptr },
+		{ "battleaxe", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeBattleaxe" },
+		{ "warhammer", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeWarhammer" },
+		{ "bow", RE::WEAPON_TYPE::kBow, nullptr },
+		{ "staff", RE::WEAPON_TYPE::kStaff, nullptr },
+		{ "crossbow", RE::WEAPON_TYPE::kCrossbow, nullptr },
 	};
 
 	// Ссылка на форму из файла правил: пишется человеком (EditorID или плагин|0xID),
@@ -545,6 +540,13 @@ namespace
 		AttackKind   kind{ AttackKind::kUnarmed };
 	};
 
+	// Совпадение оружия: тип движка и, если нужно, обязательный кейворд (battleaxe/warhammer).
+	struct WeaponMatch
+	{
+		RE::WEAPON_TYPE type{ RE::WEAPON_TYPE::kHandToHandMelee };
+		std::string     keywordText;  // обязательный кейворд (WeapTypeWarhammer); пусто = не нужен
+	};
+
 	struct Rule
 	{
 		std::string                  name;
@@ -554,7 +556,7 @@ namespace
 		Tri                          attackerShield{ Tri::kAny };
 		Tri                          playerBlocking{ Tri::kYes };
 		Tri                          playerShield{ Tri::kAny };
-		std::vector<RE::WEAPON_TYPE> weapons;
+		std::vector<WeaponMatch>     weapons;
 		std::vector<FormFilter>      races;
 		std::vector<FormFilter>      sources;
 		std::vector<FormFilter>      projectiles;
@@ -569,6 +571,9 @@ namespace
 	};
 
 	std::vector<Rule> g_rules;
+
+	// [settings] effects = off → правила срабатывают только в логе («would fire»), движок не трогаем.
+	bool g_effectsEnabled = true;
 
 	// Отложенный запуск правила: у заказанного баша нет попадания, эффект нужен в момент удара.
 	struct PendingFire
@@ -643,11 +648,12 @@ namespace
 		return false;
 	}
 
-	bool ParseWeapon(const std::string& a_value, RE::WEAPON_TYPE& a_out)
+	bool ParseWeapon(const std::string& a_value, WeaponMatch& a_out)
 	{
 		for (const auto& entry : kWeaponTable) {
 			if (a_value == entry.id) {
-				a_out = entry.type;
+				a_out.type = entry.type;
+				a_out.keywordText = entry.keyword ? entry.keyword : "";
 				return true;
 			}
 		}
@@ -696,15 +702,16 @@ namespace
 		return text.empty() ? std::string("none") : text;
 	}
 
-	std::string WeaponsText(const std::vector<RE::WEAPON_TYPE>& a_weapons)
+	std::string WeaponsText(const std::vector<WeaponMatch>& a_weapons)
 	{
 		if (a_weapons.empty()) {
 			return "any";
 		}
 		std::string text;
-		for (const auto type : a_weapons) {
+		for (const auto& match : a_weapons) {
 			for (const auto& entry : kWeaponTable) {
-				if (entry.type == type) {
+				const bool sameKeyword = (entry.keyword ? entry.keyword : "") == match.keywordText;
+				if (entry.type == match.type && sameKeyword) {
 					text += (text.empty() ? "" : ",") + std::string(entry.id);
 					break;
 				}
@@ -968,11 +975,15 @@ namespace
 				if (item == "any") {
 					continue;
 				}
-				RE::WEAPON_TYPE type{};
-				if (!ParseWeapon(item, type)) {
+				WeaponMatch match;
+				if (!ParseWeapon(item, match)) {
 					return false;
 				}
-				a_rule.weapons.push_back(type);
+				// Допущение AS-20: кейворды WeapTypeBattleaxe и WeapTypeWarhammer есть в
+				// Skyrim.esm и висят на двуручном оружии (так их используют ванильные перки).
+				// FormID здесь НЕ ищем: на загрузке LookupByEditorID их не находит (лог 0.14.0:
+				// «не понял attacker.weapon = warhammer»), а сравнение по имени работает в бою.
+				a_rule.weapons.push_back(match);
 			}
 			return true;
 		}
@@ -1023,7 +1034,7 @@ namespace
 		power.triggers = kTriggerHit;
 		power.hitRequire = static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked) |
 			static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kPowerAttack);
-		power.weapons = { RE::WEAPON_TYPE::kOneHandMace, RE::WEAPON_TYPE::kTwoHandAxe };
+		power.weapons = { WeaponMatch{ RE::WEAPON_TYPE::kOneHandMace, "" } };
 		power.playerBlocking = Tri::kYes;
 		power.playerShield = Tri::kYes;
 		power.effects = { EffectId::kUnblock, EffectId::kStagger };
@@ -1085,6 +1096,7 @@ namespace
 		std::vector<Rule> rules;
 		Rule              current;
 		bool              hasCurrent = false;
+		bool              isSettings = false;
 		int               lineNumber = 0;
 		int               broken = 0;
 		std::string       line;
@@ -1100,12 +1112,13 @@ namespace
 				continue;
 			}
 			if (line.front() == '[' && line.back() == ']') {
-				if (hasCurrent) {
+				if (hasCurrent && !isSettings) {
 					rules.push_back(current);
 				}
 				current = Rule{};
 				current.name = Trim(line.substr(1, line.size() - 2));
-				hasCurrent = true;
+				isSettings = (current.name == "settings");
+				hasCurrent = !isSettings;
 				continue;
 			}
 			const auto equal = line.find('=');
@@ -1114,19 +1127,31 @@ namespace
 				++broken;
 				continue;
 			}
-			if (!hasCurrent) {
+			if (!hasCurrent && !isSettings) {
 				logs::warn("Rules.txt:{}: ключ вне секции: {}", lineNumber, line);
 				++broken;
 				continue;
 			}
 			const auto key = Trim(line.substr(0, equal));
 			const auto value = Trim(line.substr(equal + 1));
+			if (isSettings) {
+				// Единственный ключ настроек: effects = on|off.
+				// off — правила считаются и пишутся в лог, но движок не трогают вообще
+				// (строка «would fire»). Это проверка «виноват ли наш эффект».
+				if (key == "effects") {
+					g_effectsEnabled = (value != "off");
+					continue;
+				}
+				logs::warn("Rules.txt:{}: неизвестная настройка «{} = {}»", lineNumber, key, value);
+				++broken;
+				continue;
+			}
 			if (!ApplyKey(current, key, value)) {
 				logs::warn("Rules.txt:{}: не понял «{} = {}»", lineNumber, key, value);
 				++broken;
 			}
 		}
-		if (hasCurrent) {
+		if (hasCurrent && !isSettings) {
 			rules.push_back(current);
 		}
 
@@ -1137,6 +1162,7 @@ namespace
 			g_rules = std::move(rules);
 		}
 		logs::info("Rules.txt [{}]: правил {}, строк с ошибками {}", path.string(), g_rules.size(), broken);
+		logs::info("настройки: effects={}", g_effectsEnabled ? "on" : "off (движок не трогаем, только would fire)");
 		LogRules();
 	}
 
@@ -1189,7 +1215,15 @@ namespace
 				return false;
 			}
 			const auto type = weapon->GetWeaponType();
-			if (std::find(a_rule.weapons.begin(), a_rule.weapons.end(), type) == a_rule.weapons.end()) {
+			const bool matched = std::any_of(
+				a_rule.weapons.begin(), a_rule.weapons.end(), [weapon, type](const WeaponMatch& a_match) {
+					// Тип движка у двуручного топора и молота общий, поэтому при заданном
+					// кейворде проверяем именно его: BGSKeywordForm::HasKeywordString
+					// (BGSKeywordForm.h:37) сравнивает editor ID, FormID не нужен.
+					return a_match.type == type &&
+						(a_match.keywordText.empty() || weapon->HasKeywordString(a_match.keywordText));
+				});
+			if (!matched) {
 				return false;
 			}
 		}
@@ -1223,10 +1257,12 @@ namespace
 		}
 	}
 
-	void RunEffect(EffectId a_effect, RE::Actor* a_source, const Rule& a_rule)
+	// Само действие. Вызывается НЕ из обработчика события попадания, а задачей на следующий
+	// кадр: вызовы графа анимации и каста изнутри TESHitEvent — это вход в движок, который в этот
+	// момент сам обрабатывает удар, и повторный вход в граф (staggerStart/blockStop) роняет игру.
+	void RunEffectNow(EffectId a_effect, RE::Actor* a_source, const std::string& a_why, float a_chip)
 	{
-		auto*     player = RE::PlayerCharacter::GetSingleton();
-		const std::string a_why = a_rule.name;
+		auto* player = RE::PlayerCharacter::GetSingleton();
 		switch (a_effect) {
 		case EffectId::kStagger:
 			Stagger(a_source, a_why);
@@ -1242,23 +1278,64 @@ namespace
 		case EffectId::kChip:
 			// Урон сквозь блок: блок остаётся на месте, оглушения нет (укол кинжала/меча).
 			// DamageActorValue из ActorValueOwner — урон идёт мимо блокировки.
-			if (player && a_rule.chip > 0.0f) {
-				player->DamageActorValue(RE::ActorValue::kHealth, a_rule.chip);
-				logs::info("chip: {:.1f} hp сквозь блок ({})", a_rule.chip, a_why);
+			if (player && a_chip > 0.0f) {
+				logs::info("chip: наношу {:.1f} hp ({})", a_chip, a_why);
+				player->DamageActorValue(RE::ActorValue::kHealth, a_chip);
+				logs::info("chip: {:.1f} hp сквозь блок ({})", a_chip, a_why);
 			}
 			break;
 		}
+	}
+
+	// Планировщик: эффект ставится в очередь и выполняется на следующем кадре.
+	// Состояние (дезориентация, пробы) обновляем сразу — оно ни к чему в движке не обращается.
+	void RunEffect(EffectId a_effect, RE::Actor* a_source, const Rule& a_rule)
+	{
 		if (a_effect == EffectId::kUnblock || a_effect == EffectId::kStagger) {
 			g_disorientUntil = Clock::now() +
 				std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(kDisorientSeconds));
 			g_disorientKicks = 0;
 		}
-		ScheduleProbes(a_why, a_effect == EffectId::kUnblock);
+		ScheduleProbes(a_rule.name, a_effect == EffectId::kUnblock);
+
+		if (!a_source) {
+			return;
+		}
+		struct Pending
+		{
+			EffectId        effect;
+			RE::ActorHandle source;
+			std::string     why;
+			float           chip;
+		};
+		Pending pending{ a_effect, a_source->GetHandle(), a_rule.name, a_rule.chip };
+		auto*   tasks = SKSE::GetTaskInterface();
+		if (!tasks) {
+			logs::warn("эффект {} применён немедленно: очереди задач нет", a_rule.name);
+			RunEffectNow(a_effect, a_source, a_rule.name, a_rule.chip);
+			return;
+		}
+		tasks->AddTask([pending]() {
+			auto* player = RE::PlayerCharacter::GetSingleton();
+			auto  handle = pending.source.get();
+			if (!player || !handle) {
+				logs::info("эффект {} пропущен: актёр или игрок недоступен", pending.why);
+				return;
+			}
+			logs::info("эффект {} → применяю (следующий кадр)", pending.why);
+			RunEffectNow(pending.effect, handle.get(), pending.why, pending.chip);
+		});
 	}
 
 	void FireRule(Rule& a_rule, RE::Actor* a_source, const char* a_via)
 	{
 		a_rule.lastFired = Clock::now();
+		if (!g_effectsEnabled) {
+			// Наблюдение: условие выполнено, но движок не трогаем ни одним вызовом.
+			logs::info("would fire: [{}] via={} actor={} effects={} (эффекты выключены)",
+				a_rule.name, a_via, a_source->GetName(), EffectsText(a_rule.effects));
+			return;
+		}
 		logs::info("rule fired: [{}] via={} actor={} effects={}",
 			a_rule.name,
 			a_via,
@@ -1383,6 +1460,20 @@ namespace
 			const auto* heavyBlunt = GetHeavyBlunt(a_attacker);
 			if (heavyBlunt) {
 				logs::info("hit: у бьющего тяжёлое дробящее — {}", heavyBlunt->GetName());
+			}
+			if (const auto* weapon = GetEquippedWeapon(a_attacker)) {
+				std::string keywords;
+				weapon->ForEachKeyword([&keywords](RE::BGSKeyword* a_keyword) {
+					if (a_keyword) {
+						const auto* edid = a_keyword->GetFormEditorID();
+						keywords += edid ? edid : "?";
+						keywords += std::format("({:08X}) ", a_keyword->GetFormID());
+					}
+					return RE::BSContainer::ForEachResult::kContinue;
+				});
+				logs::info("hit: оружие {} ({:08X}) тип={} кейворды: {}",
+					weapon->GetName(), weapon->GetFormID(), static_cast<int>(weapon->GetWeaponType()),
+					keywords.empty() ? "нет" : keywords);
 			}
 		}
 
@@ -1709,6 +1800,10 @@ namespace
 SKSE_PLUGIN_LOAD(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
+
+	// Каждая строка лога сразу пишется на диск: после вылета в файле остаётся последняя
+	// выполненная строка, и по ней видно, на каком вызове движка игра упала.
+	spdlog::flush_on(spdlog::level::trace);
 
 	const auto version = a_skse->RuntimeVersion();
 	logs::info("TGCombatPort native loaded, runtime {}.{}.{}.{} (без хуков)"sv,
