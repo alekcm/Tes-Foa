@@ -213,3 +213,30 @@
 ## Журнал тестов
 
 Игровых тестов не было. 2026-11-21: `TGCP_AnimEventProbe`, `TGCP_PackLeapState`, `TGCP_PlayerBlockWatcher`, `TGCP_WebSpiderAbility` скомпилированы PapyrusCompiler — 0 ошибок, 0 предупреждений. Это статическая проверка компилятором, не тест поведения. Тесты инструментов (`python -m unittest discover -s tests`) — отдельная категория, они не проверяют поведение в игре. Каждый игровой тест добавлять строкой: дата, commit, game runtime, тестовый профиль/load order, шаги, ожидаемое, фактическое, passed/failed, логи/скриншоты (если их можно распространять).
+
+---
+
+## Журнал решений (перенесено из справочников, чтобы не мешало работать)
+
+Справочники — [`docs/combat-audit.md`](docs/combat-audit.md),
+[`docs/combat-block-matrix.md`](docs/combat-block-matrix.md), [`docs/weapons-and-effects.md`](docs/weapons-and-effects.md) —
+содержат только факты и таблицы. Решения и их причины живут здесь.
+
+### Решения 22.11.2026
+
+| Решение | Чем задано |
+|---|---|
+| Одноручный топор не оглушает и блок оружием не пробивает | правила для него нет |
+| Двуручный топор не оглушает, вместо этого травма | `wound` — план, кода нет |
+| Двуручный меч на зажатие — широкий выпад по площади, высокий урон без эффектов, блоком не пробивает | правила нет |
+| Двуручный молот пробивает щит, топор — нет | `[twohand-warhammer-breaks-shield-block]`, кейворд `WeapTypeWarhammer` |
+| Щит дезориентирует только того, у кого нет никакого блока | `[shield-bash-staggers-unblocked]` |
+| Сквозь блок оружием щит не пробивает и блок не снимает | правила сознательно нет |
+| Лук и арбалет простреливают блок оружием | `[arrow-and-bolt-through-weapon-block]`, `chip = 8` |
+| Вся магия проходит сквозь блок оружием | `[spell-through-weapon-block]`, `chip = 6` |
+| Снаряд гасится щитом, AoE пробивает щит, цепная молния проходит щит | нужно `hit.projectile = any/none` — код |
+| Сковывающая земля — пятно 2,5 м на земле, не дебафф на игрока | [`docs/enemy-spells.md`](docs/enemy-spells.md) §2.4 |
+| Заклинания врагов — свои, с нуля | [`docs/enemy-spells.md`](docs/enemy-spells.md) |
+| Ваншотов нет никогда | потолок: 25 % макс. HP за каст, 9 % за тик |
+| Контроль не дольше 0,8 с | только стаггер как наказание за ошибку |
+| Заклинание берём только если даёт новое решение | отклонено: Fracture, Corpse Explosion, Slay Living, Magicka Void, Welling Blood, Malviser's Gauntlet, Talons of Nirn, Thrumming Stone, Crackle/Hailstone/Bolide/Sleet Storm/Volcano/Apocalypse, чистое лечение, Entomb, Banish Living |
