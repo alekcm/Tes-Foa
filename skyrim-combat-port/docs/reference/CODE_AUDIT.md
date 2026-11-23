@@ -19,6 +19,8 @@
 
 | Функция | Откуда взято поведение | Допущения | Проверка в игре |
 |---|---|---|---|
+| `ResetWorldState` | снимает подписки, очищает временные очереди и отменяет старые задачи по поколению мира | — | проверка смены сейва |
+| `OnSKSEMessage` | `kDataLoaded`: загрузка правил и подписка; `kPreLoadGame`: сброс временного состояния; `kPostLoadGame`/`kNewGame`: разрешение обработки | — | строки `SKSE DataLoaded`, `SKSE PreLoadGame`, `SKSE PostLoadGame` |
 | `SKSE_PLUGIN_LOAD` | стандартная точка входа SKSE; версия рантайма логируется | — | `TGCombatPort v0-7-1-0` первой строкой **[A]** |
 | `RegisterPapyrusFunctions` | `IVirtualMachine::RegisterFunction`, имена совпадают с `TGCP_Native.psc` | — | `Papyrus functions registered: …` **[A]** |
 | `HasShield` | щит = `TESObjectARMO::IsShield()` в экипированной руке; UESP: блокировать можно щитом/оружием **[B]** | — | `diag: … shield=True/False` **[A]** |

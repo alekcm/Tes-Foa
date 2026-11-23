@@ -150,6 +150,13 @@ jobs:
           }
           "PKG_NAME=$name" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
+      - name: Upload installable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: TGCombatPort-installable
+          path: skyrim-combat-port/native/${{ env.PKG_NAME }}
+          if-no-files-found: error
+
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh

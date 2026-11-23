@@ -55,7 +55,7 @@
 #     поток, разряд без снаряда) пробивает и щит.
 
 [settings]
-# effects = off — правила считаются и пишутся в лог, но движок не трогаем вообще
+# effects = off — правила считаются, эффекты не выполняются
 # (в логе появляется «would fire» вместо «rule fired»). Это способ проверить,
 # виноват ли эффект плагина: если игра падает и в этом режиме, дело не в эффектах.
 effects = on
@@ -65,6 +65,8 @@ effects = on
 # Если игрок блокирует оружием — щит не пробивает и блок не снимает: правила на этот
 # случай СОЗНАТЕЛЬНО НЕТ.
 trigger = hit, bash
+hit-flags = bash
+attacker.shield = yes
 player.blocking = no
 do = stagger
 cooldown = 3
@@ -128,6 +130,7 @@ cooldown = 0
 [arrow-and-bolt-through-weapon-block]
 # Лук и арбалет простреливают блок оружием насквозь. Щит держит: player.shield = no.
 trigger = hit
+reach = no
 hit-flags = blocked
 attack.kind = ranged
 attacker.weapon = bow, crossbow
@@ -142,6 +145,7 @@ cooldown = 0
 [spell-through-weapon-block]
 # Вся магия проходит сквозь блок оружием; вард её гасит, поэтому player.ward = no.
 trigger = hit
+reach = no
 hit-flags = blocked
 attack.kind = spell
 player.blocking = yes

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -68,7 +69,9 @@ def check_line(key: str, value: str) -> list[str]:
         problems += [f"do: неизвестный эффект «{i}» (есть: {', '.join(sorted(EFFECTS))})" for i in items if i not in EFFECTS]
     elif key in ("cooldown", "chip"):
         try:
-            float(value)
+            number = float(value)
+            if not math.isfinite(number) or number < 0:
+                problems.append(f"{key}: нужно конечное неотрицательное число, написано «{value}»")
         except ValueError:
             problems.append(f"{key}: нужно число, написано «{value}»")
     return problems

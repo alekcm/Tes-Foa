@@ -1,10 +1,8 @@
 // TGCombatPort — SKSE-плагин (DLL).
 //
-// Правила механики (решение пользователя 22.11.2026):
-//   1. Игрок блокирует НЕ щитом (оружием/кулаками) → щитоносец выбивает его из блока.
-//   2. Игрок блокирует ЩИТОМ → башем не выбивают; щит пробивает силовая атака того,
-//      у кого булава или двуручный молот.
-//   3. Игрок не блокирует → плагин не вмешивается.
+// Текущие правила находятся в native/rules/Rules.txt. В 0.16.0 щитовой баш
+// дезориентирует лишь неблокирующего игрока, а автоматический заказ баша против
+// блока отключён. Исторические результаты измерений — в docs/reference/.
 //
 // Чем подтверждено (docs/reference/):
 //   * «выбить из блока» в движке умеет только стаггер: «Staggering interrupts whatever action was
@@ -27,6 +25,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -46,6 +45,8 @@ namespace
 	constexpr float kDisorientSeconds = 1.2f;     // сколько держим «дезориентацию» после пробития блока
 
 	std::atomic_bool g_enabled{ true };
+	std::atomic_bool g_worldReady{ false };
+	std::atomic<std::uint64_t> g_worldGeneration{ 0 };
 	std::atomic<std::uint64_t> g_ticks{ 0 };
 	std::atomic<std::uint64_t> g_bashes{ 0 };
 	std::atomic<std::uint64_t> g_staggers{ 0 };
@@ -70,7 +71,7 @@ namespace
 	public:
 		RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>*) override
 		{
-			if (!a_event || !a_event->tag.c_str()) {
+			if (!g_worldReady.load() || !g_enabled.load() || !a_event || !a_event->tag.c_str()) {
 				return RE::BSEventNotifyControl::kContinue;
 			}
 			const std::string_view tag{ a_event->tag.c_str() };
@@ -97,7 +98,7 @@ namespace
 	public:
 		RE::BSEventNotifyControl ProcessEvent(const RE::TESHitEvent* a_event, RE::BSTEventSource<RE::TESHitEvent>*) override
 		{
-			if (!a_event) {
+			if (!a_event || !g_worldReady.load() || !g_enabled.load()) {
 				return RE::BSEventNotifyControl::kContinue;
 			}
 			auto* player = RE::PlayerCharacter::GetSingleton();
@@ -963,11 +964,13 @@ namespace
 		if (a_key == "player.ward") { return ParseTri(a_value, a_rule.playerWard); }
 		if (a_key == "chip") {
 			try {
-				a_rule.chip = std::stof(a_value);
+				std::size_t used = 0;
+				a_rule.chip = std::stof(a_value, &used);
+				if (used != a_value.size()) { return false; }
 			} catch (...) {
 				return false;
 			}
-			return a_rule.chip >= 0.0f;
+			return std::isfinite(a_rule.chip) && a_rule.chip >= 0.0f;
 		}
 		if (a_key == "attacker.weapon") {
 			a_rule.weapons.clear();
@@ -997,11 +1000,13 @@ namespace
 		}
 		if (a_key == "cooldown") {
 			try {
-				a_rule.cooldown = std::stof(a_value);
+				std::size_t used = 0;
+				a_rule.cooldown = std::stof(a_value, &used);
+				if (used != a_value.size()) { return false; }
 			} catch (...) {
 				return false;
 			}
-			return a_rule.cooldown >= 0.0f;
+			return std::isfinite(a_rule.cooldown) && a_rule.cooldown >= 0.0f;
 		}
 		if (a_key == "do") {
 			a_rule.effects.clear();
@@ -1019,28 +1024,8 @@ namespace
 
 	void AddDefaultRules()
 	{
-		Rule bash;
-		bash.name = "bandit-bash-breaks-weapon-block";
-		bash.triggers = kTriggerHit | kTriggerBash;
-		bash.hitRequire = static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked);
-		bash.attackerShield = Tri::kYes;
-		bash.playerBlocking = Tri::kYes;
-		bash.playerShield = Tri::kNo;
-		bash.effects = { EffectId::kUnblock, EffectId::kStagger };
-		bash.cooldown = kStaggerCooldown;
-
-		Rule power;
-		power.name = "heavy-blunt-power-breaks-shield-block";
-		power.triggers = kTriggerHit;
-		power.hitRequire = static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kHitBlocked) |
-			static_cast<std::uint8_t>(RE::TESHitEvent::Flag::kPowerAttack);
-		power.weapons = { WeaponMatch{ RE::WEAPON_TYPE::kOneHandMace, "" } };
-		power.playerBlocking = Tri::kYes;
-		power.playerShield = Tri::kYes;
-		power.effects = { EffectId::kUnblock, EffectId::kStagger };
-		power.cooldown = kStaggerCooldown;
-
-		g_rules = { bash, power };
+		// Нет файла правил — безопасный отказ, а не устаревшие противоречащие дизайну правила.
+		g_rules.clear();
 	}
 
 	void LogRules()
@@ -1079,7 +1064,7 @@ namespace
 	}
 
 	// Допущение AS-11: файл правил лежит в Data/SKSE/Plugins/TGCombatPort/Rules.txt
-	// относительно рабочего каталога игры; если его нет — работают встроенные правила.
+	// относительно рабочего каталога игры; если его нет — механика правил отключена.
 	void LoadRules()
 	{
 		g_rules.clear();
@@ -1087,7 +1072,7 @@ namespace
 		const auto    path = RulesPath();
 		std::ifstream file(path);
 		if (!file) {
-			logs::info("Rules.txt не найден [{}], работают встроенные правила", path.empty() ? std::string("<нет пути>") : path.string());
+			logs::info("Rules.txt не найден [{}], механика правил отключена", path.empty() ? std::string("<нет пути>") : path.string());
 			AddDefaultRules();
 			LogRules();
 			return;
@@ -1124,6 +1109,7 @@ namespace
 			const auto equal = line.find('=');
 			if (equal == std::string::npos) {
 				logs::warn("Rules.txt:{}: строка без «=»: {}", lineNumber, line);
+				if (hasCurrent) { current.valid = false; }
 				++broken;
 				continue;
 			}
@@ -1136,10 +1122,16 @@ namespace
 			const auto value = Trim(line.substr(equal + 1));
 			if (isSettings) {
 				// Единственный ключ настроек: effects = on|off.
-				// off — правила считаются и пишутся в лог, но движок не трогают вообще
+				// off — правила считаются и пишутся в лог, эффекты не выполняются
 				// (строка «would fire»). Это проверка «виноват ли наш эффект».
 				if (key == "effects") {
-					g_effectsEnabled = (value != "off");
+					if (value == "on" || value == "off") {
+						g_effectsEnabled = (value == "on");
+					} else {
+						g_effectsEnabled = false;
+						logs::warn("Rules.txt:{}: неверное effects={}, эффекты выключены", lineNumber, value);
+						++broken;
+					}
 					continue;
 				}
 				logs::warn("Rules.txt:{}: неизвестная настройка «{} = {}»", lineNumber, key, value);
@@ -1148,6 +1140,7 @@ namespace
 			}
 			if (!ApplyKey(current, key, value)) {
 				logs::warn("Rules.txt:{}: не понял «{} = {}»", lineNumber, key, value);
+				current.valid = false;
 				++broken;
 			}
 		}
@@ -1156,13 +1149,13 @@ namespace
 		}
 
 		if (rules.empty()) {
-			logs::warn("Rules.txt: {} — правил нет, работают встроенные", path.string());
+			logs::warn("Rules.txt: {} — правил нет, механика правил отключена", path.string());
 			AddDefaultRules();
 		} else {
 			g_rules = std::move(rules);
 		}
 		logs::info("Rules.txt [{}]: правил {}, строк с ошибками {}", path.string(), g_rules.size(), broken);
-		logs::info("настройки: effects={}", g_effectsEnabled ? "on" : "off (движок не трогаем, только would fire)");
+		logs::info("настройки: effects={}", g_effectsEnabled ? "on" : "off (эффекты выключены, would fire)");
 		LogRules();
 	}
 
@@ -1206,7 +1199,7 @@ namespace
 		}
 		// Допущение AS-15: вард-спелл выставляет актёрскую величину kWardPower (ActorValues.h),
 		// поэтому «блок магией» читается напрямую из актёра, а не угадывается.
-		if (!MatchTri(a_rule.playerWard, HasWard(a_player))) {
+		if (a_rule.playerWard != Tri::kAny && !MatchTri(a_rule.playerWard, HasWard(a_player))) {
 			return false;
 		}
 		if (!a_rule.weapons.empty()) {
@@ -1311,11 +1304,14 @@ namespace
 		Pending pending{ a_effect, a_source->GetHandle(), a_rule.name, a_rule.chip };
 		auto*   tasks = SKSE::GetTaskInterface();
 		if (!tasks) {
-			logs::warn("эффект {} применён немедленно: очереди задач нет", a_rule.name);
-			RunEffectNow(a_effect, a_source, a_rule.name, a_rule.chip);
+			logs::warn("эффект {} пропущен: очереди задач нет", a_rule.name);
 			return;
 		}
-		tasks->AddTask([pending]() {
+		const auto generation = g_worldGeneration.load();
+		tasks->AddTask([pending, generation]() {
+			if (!g_worldReady.load() || !g_enabled.load() || generation != g_worldGeneration.load()) {
+				return;
+			}
 			auto* player = RE::PlayerCharacter::GetSingleton();
 			auto  handle = pending.source.get();
 			if (!player || !handle) {
@@ -1331,7 +1327,7 @@ namespace
 	{
 		a_rule.lastFired = Clock::now();
 		if (!g_effectsEnabled) {
-			// Наблюдение: условие выполнено, но движок не трогаем ни одним вызовом.
+			// Наблюдение: условие выполнено, но эффекты не запускаются.
 			logs::info("would fire: [{}] via={} actor={} effects={} (эффекты выключены)",
 				a_rule.name, a_via, a_source->GetName(), EffectsText(a_rule.effects));
 			return;
@@ -1358,7 +1354,7 @@ namespace
 				++it;
 				continue;
 			}
-			auto*             source = it->source.get().get();
+			auto              source = it->source.get();
 			const std::size_t index = it->rule;
 			it = g_pendingFires.erase(it);
 
@@ -1366,14 +1362,14 @@ namespace
 				continue;
 			}
 			auto& rule = g_rules[index];
-			if (!RuleMatches(rule, kTriggerBash, source, player, HitContext{})) {
+			if (!RuleMatches(rule, kTriggerBash, source.get(), player, HitContext{})) {
 				logs::info("rule skipped: [{}] источник уже не подходит", rule.name);
 				continue;
 			}
 			if (RuleOnCooldown(rule, a_now)) {
 				continue;
 			}
-			FireRule(rule, source, "заказ");
+			FireRule(rule, source.get(), "заказ");
 		}
 	}
 
@@ -1461,20 +1457,6 @@ namespace
 			if (heavyBlunt) {
 				logs::info("hit: у бьющего тяжёлое дробящее — {}", heavyBlunt->GetName());
 			}
-			if (const auto* weapon = GetEquippedWeapon(a_attacker)) {
-				std::string keywords;
-				weapon->ForEachKeyword([&keywords](RE::BGSKeyword* a_keyword) {
-					if (a_keyword) {
-						const auto* edid = a_keyword->GetFormEditorID();
-						keywords += edid ? edid : "?";
-						keywords += std::format("({:08X}) ", a_keyword->GetFormID());
-					}
-					return RE::BSContainer::ForEachResult::kContinue;
-				});
-				logs::info("hit: оружие {} ({:08X}) тип={} кейворды: {}",
-					weapon->GetName(), weapon->GetFormID(), static_cast<int>(weapon->GetWeaponType()),
-					keywords.empty() ? "нет" : keywords);
-			}
 		}
 
 		bool matched = false;
@@ -1552,7 +1534,7 @@ namespace
 				++it;
 				continue;
 			}
-			if (auto actor = it->actor.get().get()) {
+			if (auto actor = it->actor.get()) {
 				actor->RemoveAnimationGraphEventSink(&g_bashSink);
 			}
 			it = g_watches.erase(it);
@@ -1654,8 +1636,8 @@ namespace
 
 		for (const auto* handles : { &processLists->highActorHandles, &processLists->middleHighActorHandles }) {
 			for (const auto& handle : *handles) {
-				auto* actor = handle.get().get();
-				if (!actor || actor == a_player) {
+				auto actor = handle.get();
+				if (!actor || actor.get() == a_player) {
 					continue;
 				}
 				const float distance = actor->GetPosition().GetDistance(a_player->GetPosition());
@@ -1673,7 +1655,7 @@ namespace
 				line += std::format("\n  {} dist={:.0f} shield={} weapon={} blocking={} attacking={}",
 					actor->GetName(),
 					distance,
-					HasShield(actor),
+					HasShield(actor.get()),
 					(weapon && !armo) ? weapon->GetName() : (armo && armo->IsShield() ? "<щит>" : "?"),
 					actor->IsBlocking(),
 					actor->IsAttacking());
@@ -1705,9 +1687,9 @@ namespace
 			return;  // щит пробивает только настоящая силовая атака — её ловит HitSink
 		}
 
-		if (HasShield(a_actor)) {
+		if (HasShield(a_actor) && g_effectsEnabled) {
 			OrderBash(a_actor, distance, a_now);
-		} else if (g_rejectLogged.fetch_add(1, std::memory_order_relaxed) < 5) {
+		} else if (!HasShield(a_actor) && g_rejectLogged.fetch_add(1, std::memory_order_relaxed) < 5) {
 			logs::info("skip: actor={} без щита, башем не выбивает", a_actor->GetName());
 		}
 	}
@@ -1725,6 +1707,7 @@ namespace
 
 	void PapyrusTick(RE::StaticFunctionTag*)
 	{
+		if (!g_worldReady.load() || !g_enabled.load()) { return; }
 		g_ticks.fetch_add(1, std::memory_order_relaxed);
 
 		const auto now = Clock::now();
@@ -1750,21 +1733,10 @@ namespace
 			LogDiagnostics(player, now);
 		}
 
-		if (!player->IsBlocking()) {
-			return;
-		}
+		// Больше не заказываем баш автоматически против блока оружием: по текущему
+		// дизайну щит оглушает только незаблокированным попаданием. Явный эффект
+		// bash в Rules.txt по-прежнему может вызвать OrderBash.
 
-		const auto* processLists = RE::ProcessLists::GetSingleton();
-		if (!processLists) {
-			return;
-		}
-
-		const bool playerBlocksWithShield = HasShield(player);
-		for (const auto* handles : { &processLists->highActorHandles, &processLists->middleHighActorHandles }) {
-			for (const auto& handle : *handles) {
-				ConsiderActor(handle.get().get(), player, playerBlocksWithShield, now);
-			}
-		}
 	}
 
 	void PapyrusSetEnabled(RE::StaticFunctionTag*, bool a_enabled)
@@ -1783,6 +1755,56 @@ namespace
 			g_bashReach,
 			g_staggerSpell ? g_staggerSpell->GetName() : "<нет>",
 			g_enabled.load(std::memory_order_relaxed));
+	}
+
+	void ResetWorldState()
+	{
+		g_worldReady.store(false);
+		++g_worldGeneration;
+		// Удаляем подписки до замены мира; не переносим задачи и таймеры в другой сейв.
+		for (auto& watch : g_watches) {
+			if (auto actor = watch.actor.get()) { actor->RemoveAnimationGraphEventSink(&g_bashSink); }
+		}
+		g_watches.clear();
+		g_pendingFires.clear();
+		g_blockProbes.clear();
+		g_attempts.clear();
+		g_disorientUntil = {};
+		g_disorientKicks = 0;
+		g_lastStagger = {};
+		for (auto& rule : g_rules) { rule.lastFired = {}; }
+	}
+
+	void OnSKSEMessage(SKSE::MessagingInterface::Message* a_message)
+	{
+		if (!a_message) { return; }
+		switch (a_message->type) {
+		case SKSE::MessagingInterface::kDataLoaded:
+			logs::info("SKSE DataLoaded: загрузка правил и регистрация событий");
+			ReadEngineSettings();
+			LoadRules();
+			if (auto* holder = RE::ScriptEventSourceHolder::GetSingleton()) {
+				holder->AddEventSink(&g_hitSink);
+				logs::info("hit sink registered (TESHitEvent)");
+			} else {
+				logs::error("ScriptEventSourceHolder недоступен");
+			}
+			break;
+		case SKSE::MessagingInterface::kPreLoadGame:
+			ResetWorldState();
+			logs::info("SKSE PreLoadGame: обработка боя приостановлена");
+			break;
+		case SKSE::MessagingInterface::kPostLoadGame:
+			// SKSE передаёт результат как bool в указателе data, а не адрес bool.
+			g_worldReady.store(a_message->data != nullptr);
+			logs::info("SKSE PostLoadGame: worldReady={}", g_worldReady.load());
+			break;
+		case SKSE::MessagingInterface::kNewGame:
+			ResetWorldState();
+			g_worldReady.store(true);
+			logs::info("SKSE NewGame: обработка боя включена");
+			break;
+		}
 	}
 
 	bool RegisterPapyrusFunctions(RE::BSScript::IVirtualMachine* a_vm)
@@ -1812,8 +1834,10 @@ SKSE_PLUGIN_LOAD(const SKSE::LoadInterface* a_skse)
 		version.patch(),
 		version.build());
 
-	ReadEngineSettings();
-	LoadRules();
+	if (const auto messaging = SKSE::GetMessagingInterface(); !messaging || !messaging->RegisterListener(OnSKSEMessage)) {
+		logs::error("SKSE Messaging недоступен: инициализация отменена");
+		return false;
+	}
 
 	if (const auto papyrus = SKSE::GetPapyrusInterface(); papyrus) {
 		papyrus->Register(RegisterPapyrusFunctions);
@@ -1821,12 +1845,6 @@ SKSE_PLUGIN_LOAD(const SKSE::LoadInterface* a_skse)
 		logs::error("Papyrus interface недоступен"sv);
 	}
 
-	if (auto* holder = RE::ScriptEventSourceHolder::GetSingleton(); holder) {
-		holder->AddEventSink(&g_hitSink);
-		logs::info("hit sink registered (TESHitEvent)"sv);
-	} else {
-		logs::error("ScriptEventSourceHolder недоступен, попадания не отслеживаются"sv);
-	}
 
 	return true;
 }

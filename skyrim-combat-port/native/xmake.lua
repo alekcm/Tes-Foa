@@ -5,7 +5,7 @@
 includes("lib/commonlibsse-ng")
 
 set_project("TGCombatPort")
-set_version("0.15.0")
+set_version("0.16.0")
 set_license("GPL-3.0")
 set_languages("c++23")
 
