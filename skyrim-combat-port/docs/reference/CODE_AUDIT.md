@@ -50,11 +50,10 @@
 | `RunEffectNow` | таблица эффектов, выполняется уже вне обработчика `TESHitEvent`: `stagger` → `Stagger`, `unblock` → `KickBlock`, `chip` → `DamageActorValue`, `bash` → `OrderBash` **[A]** | `AS-10` | `stagger anim: отправляю …`, `block kick: … отправляю blockStop`, `chip: наношу …` |
 | `FireRule` | применение эффектов по порядку + кулдаун правила | — | `rule fired: [имя] via=попадание|заказ` |
 | `ProcessPendingFires` | отложенный запуск правила на заказ баша | `AS-3` | `rule fired: … via=заказ` или `rule skipped: …` |
-| `StaggerByGraph` | `Actor::NotifyAnimationGraph("staggerStart")` — собственное состояние стаггера графа **[A]** (тег — по факту из лога) | `AS-14` | `stagger anim: staggerStart sent=true` |
-| `Stagger` | сначала граф, при отказе — спелл (`ApplyStagger`) | `AS-14`, `AS-2` | `stagger anim:` или `stagger cast:` |
-| `ProcessDisorient` | повторное гашение блока в окне дезориентации (1,2 с) | `AS-10`, `AS-14` | `block kick: дезориентация: блок не удержать` |
+| `Stagger` | только спелл (`ApplyStagger`); путь через `staggerStart` убран в 0.15.0 как неподтверждённый | `AS-2` | `stagger cast: …` |
+| `ProcessDisorient` | повторное гашение блока в окне дезориентации (1,2 с) | `AS-10` | `block kick: дезориентация: блок не удержать` |
 | `KickBlock` | своего API для блока нет (`verify_api.py`), состояние блока живёт в графе; `blockStop` — событие графа **[A]/[B]** | `AS-10` | `block kick: … blockStop sent=true` |
-| `ApplyStagger` | `MagicCaster::CastSpellImmediate` (VTABLE 01); `MagicSystem::CastingSource::kInstant` **[A]** | `AS-2`, `AS-4`, `AS-10` (опровергнуто), `AS-14` | `stagger cast: … mag=1.00` |
+| `ApplyStagger` | `MagicCaster::CastSpellImmediate` (VTABLE 01); `MagicSystem::CastingSource::kInstant` **[A]** | `AS-2`, `AS-4`, `AS-10` (опровергнуто) | `stagger cast: … mag=1.00` |
 | `ProcessBlockProbes` | `Actor::IsBlocking()`, `Actor::IsStaggering()` **[A]** | `AS-7` | `block probe: … blocking=… staggered=…` |
 | `ReadEngineSettings` | `GameSettingCollection::GetSetting`, `Setting::GetFloat` **[A]**; `fCombatBashReach = 141` **[B]** | `AS-9` | `fCombatBashReach = 141 (дистанция баша)` |
 | `HitSink::ProcessEvent` | `BSTEventSink<TESHitEvent>` + `ScriptEventSourceHolder::AddEventSink` **[A]** | `AS-5` | `hit sink registered (TESHitEvent)` |

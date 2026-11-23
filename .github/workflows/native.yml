@@ -40,6 +40,14 @@ jobs:
           cd lib/commonlibsse-ng
           git checkout -q 48b17e1dea3028850adf63209f6733dbf4dcdcd7
 
+      # Проверка, что код ссылается только на существующие имена движка: каталог типов,
+      # методов и констант берётся из заголовков, а не из памяти агента.
+      - name: Check engine API usage
+        shell: pwsh
+        run: |
+          python ../tools/check_api_usage.py --headers lib/commonlibsse-ng/include --quiet
+          if ($LASTEXITCODE -ne 0) { throw "check_api_usage failed: $LASTEXITCODE" }
+
       - name: Build
         shell: pwsh
         run: |

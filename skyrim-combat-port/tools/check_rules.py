@@ -23,6 +23,9 @@ TRIGGERS = {"hit", "bash"}
 TRI = {"yes", "no", "any"}
 FLAGS = {"blocked", "power", "bash", "sneak"}
 EFFECTS = {"unblock", "stagger", "bash", "chip"}
+# Секция [settings] — не правило, а переключатели плагина.
+SETTINGS = {"effects"}
+SETTINGS_VALUES = {"effects": {"on", "off"}}
 KEYS = {
     "trigger",
     "hit-flags",
@@ -82,6 +85,8 @@ def check_text(text: str) -> tuple[list[str], list[str]]:
             continue
         if line.startswith("[") and line.endswith("]"):
             section = line[1:-1].strip()
+            if section == "settings":
+                continue
             names.append(section)
             continue
         if "=" not in line:
@@ -90,6 +95,12 @@ def check_text(text: str) -> tuple[list[str], list[str]]:
         key, value = (part.strip() for part in line.split("=", 1))
         if not section:
             problems.append(f"строка {number}: ключ «{key}» вне секции [имя]")
+            continue
+        if section == "settings":
+            if key not in SETTINGS:
+                problems.append(f"строка {number} [settings]: неизвестная настройка «{key}» (есть: {', '.join(sorted(SETTINGS))})")
+            elif value not in SETTINGS_VALUES[key]:
+                problems.append(f"строка {number} [settings]: «{key}» принимает {', '.join(sorted(SETTINGS_VALUES[key]))}, написано «{value}»")
             continue
         if key not in KEYS:
             problems.append(f"строка {number} [{section}]: неизвестный ключ «{key}»")

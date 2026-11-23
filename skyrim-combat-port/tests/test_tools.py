@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,7 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
+TOOLS = ROOT / "tools"
 sys.path.insert(0, str(ROOT / "tools"))
 
 import build  # noqa: E402
@@ -877,3 +879,52 @@ class WeaponTableTests(unittest.TestCase):
         source = (ROOT / "native" / "src" / "main.cpp").read_text(encoding="utf-8")
         self.assertIn('"warhammer", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeWarhammer"', source)
         self.assertIn('"battleaxe", RE::WEAPON_TYPE::kTwoHandAxe, "WeapTypeBattleaxe"', source)
+
+class SettingsSectionTests(unittest.TestCase):
+    """[settings] — не правило, а переключатели; опечатки в них тоже ловятся."""
+
+    def test_settings_section_is_not_a_rule(self) -> None:
+        problems, names = check_rules.check_text("[settings]\neffects = on\n\n[rule-a]\ntrigger = hit\n")
+        self.assertEqual(problems, [])
+        self.assertEqual(names, ["rule-a"])
+
+    def test_settings_effects_off_is_allowed(self) -> None:
+        problems, _ = check_rules.check_text("[settings]\neffects = off\n")
+        self.assertEqual(problems, [])
+
+    def test_settings_rejects_unknown_value(self) -> None:
+        problems, _ = check_rules.check_text("[settings]\neffects = maybe\n")
+        self.assertTrue(any("effects" in problem for problem in problems))
+
+    def test_settings_rejects_unknown_key(self) -> None:
+        problems, _ = check_rules.check_text("[settings]\nstagger = on\n")
+        self.assertTrue(any("stagger" in problem for problem in problems))
+
+    def test_shipped_rules_have_no_errors(self) -> None:
+        path = ROOT / "native" / "rules" / "Rules.txt"
+        problems, names = check_rules.check_text(path.read_text(encoding="utf-8"))
+        self.assertEqual(problems, [])
+        self.assertEqual(len(names), 8)
+
+
+class ApiUsageToolTests(unittest.TestCase):
+    """Проверка вызовов движка по заголовкам: инструмент обязан ругаться на неверный путь."""
+
+    def test_help(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(TOOLS / "check_api_usage.py"), "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("--headers", result.stdout)
+
+    def test_missing_header_dir(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(TOOLS / "check_api_usage.py"), "--headers", "/nonexistent-dir-xyz"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)

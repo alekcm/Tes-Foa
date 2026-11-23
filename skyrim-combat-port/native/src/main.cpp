@@ -392,33 +392,18 @@ namespace
 		logs::info("block kick: {} → blockStop sent={}", a_why, sent);
 	}
 
-	// Основной способ: переводим игрока в собственное состояние стаггера графа (staggerStart).
-	// Это то состояние, которым движок сам прерывает действия (UESP: «Staggering interrupts
-	// whatever action was being taken by the target»), и в отличие от спелла оно не даёт
-	// ни урона, ни эффектов на земле (лог 0.7.2: «Топот великана» бил игрока и рисовал разлом).
-	// Допущение AS-14.
-	bool StaggerByGraph(RE::PlayerCharacter* a_player, const std::string& a_why)
-	{
-		if (!a_player) {
-			return false;
-		}
-		logs::info("stagger anim: отправляю staggerStart ({})", a_why);
-		const bool sent = a_player->NotifyAnimationGraph(RE::BSFixedString("staggerStart"));
-		logs::info("stagger anim: staggerStart sent={} ({})", sent, a_why);
-		return sent;
-	}
-
 	// Накладываем стаггер на игрока от имени NPC: caster — сам NPC, target — игрок.
 	// AS-1 опровергнуто логом 0.7.1: стаггер НЕ снимает блок у игрока, поэтому блок гасим отдельно
 	// (AS-10, KickBlock). Подтверждены: AS-2 (стаггер виден), AS-4 (каст без анимации).
 	// Эффект stagger: сначала состояние графа (без урона и визуальных эффектов),
 	// и только если граф отказал — спелл-стаггер.
+	// Стаггер ставим ТОЛЬКО проверенным путём — кастом существующего спелла от лица NPC.
+	// Этот путь подтверждён логами 0.7.1/0.8.0 («stagger cast: … каст прошёл, блок снят»).
+	// Попытка через NotifyAnimationGraph("staggerStart") убрана в 0.15.0: она не дала ни одной
+	// строки «sent=true» ни в одном логе, то есть ни разу не сработала, и это единственный
+	// вызов движка на пути попадания, у которого нет подтверждения работоспособности.
 	void Stagger(RE::Actor* a_source, const std::string& a_why)
 	{
-		auto* player = RE::PlayerCharacter::GetSingleton();
-		if (StaggerByGraph(player, a_why)) {
-			return;
-		}
 		ApplyStagger(a_source, a_why.c_str());
 	}
 
@@ -586,6 +571,9 @@ namespace
 	};
 
 	std::vector<Rule> g_rules;
+
+	// [settings] effects = off → правила срабатывают только в логе («would fire»), движок не трогаем.
+	bool g_effectsEnabled = true;
 
 	// Отложенный запуск правила: у заказанного баша нет попадания, эффект нужен в момент удара.
 	struct PendingFire
@@ -1108,6 +1096,7 @@ namespace
 		std::vector<Rule> rules;
 		Rule              current;
 		bool              hasCurrent = false;
+		bool              isSettings = false;
 		int               lineNumber = 0;
 		int               broken = 0;
 		std::string       line;
@@ -1123,12 +1112,13 @@ namespace
 				continue;
 			}
 			if (line.front() == '[' && line.back() == ']') {
-				if (hasCurrent) {
+				if (hasCurrent && !isSettings) {
 					rules.push_back(current);
 				}
 				current = Rule{};
 				current.name = Trim(line.substr(1, line.size() - 2));
-				hasCurrent = true;
+				isSettings = (current.name == "settings");
+				hasCurrent = !isSettings;
 				continue;
 			}
 			const auto equal = line.find('=');
@@ -1137,19 +1127,31 @@ namespace
 				++broken;
 				continue;
 			}
-			if (!hasCurrent) {
+			if (!hasCurrent && !isSettings) {
 				logs::warn("Rules.txt:{}: ключ вне секции: {}", lineNumber, line);
 				++broken;
 				continue;
 			}
 			const auto key = Trim(line.substr(0, equal));
 			const auto value = Trim(line.substr(equal + 1));
+			if (isSettings) {
+				// Единственный ключ настроек: effects = on|off.
+				// off — правила считаются и пишутся в лог, но движок не трогают вообще
+				// (строка «would fire»). Это проверка «виноват ли наш эффект».
+				if (key == "effects") {
+					g_effectsEnabled = (value != "off");
+					continue;
+				}
+				logs::warn("Rules.txt:{}: неизвестная настройка «{} = {}»", lineNumber, key, value);
+				++broken;
+				continue;
+			}
 			if (!ApplyKey(current, key, value)) {
 				logs::warn("Rules.txt:{}: не понял «{} = {}»", lineNumber, key, value);
 				++broken;
 			}
 		}
-		if (hasCurrent) {
+		if (hasCurrent && !isSettings) {
 			rules.push_back(current);
 		}
 
@@ -1160,6 +1162,7 @@ namespace
 			g_rules = std::move(rules);
 		}
 		logs::info("Rules.txt [{}]: правил {}, строк с ошибками {}", path.string(), g_rules.size(), broken);
+		logs::info("настройки: effects={}", g_effectsEnabled ? "on" : "off (движок не трогаем, только would fire)");
 		LogRules();
 	}
 
@@ -1327,6 +1330,12 @@ namespace
 	void FireRule(Rule& a_rule, RE::Actor* a_source, const char* a_via)
 	{
 		a_rule.lastFired = Clock::now();
+		if (!g_effectsEnabled) {
+			// Наблюдение: условие выполнено, но движок не трогаем ни одним вызовом.
+			logs::info("would fire: [{}] via={} actor={} effects={} (эффекты выключены)",
+				a_rule.name, a_via, a_source->GetName(), EffectsText(a_rule.effects));
+			return;
+		}
 		logs::info("rule fired: [{}] via={} actor={} effects={}",
 			a_rule.name,
 			a_via,
